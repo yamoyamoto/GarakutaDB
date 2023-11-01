@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.31.0
 // 	protoc        v3.6.1
-// source: tuple_value.proto
+// source: tuple.proto
 
 package storage
 
@@ -31,7 +31,7 @@ type TupleValue struct {
 func (x *TupleValue) Reset() {
 	*x = TupleValue{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_tuple_value_proto_msgTypes[0]
+		mi := &file_tuple_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -44,7 +44,7 @@ func (x *TupleValue) String() string {
 func (*TupleValue) ProtoMessage() {}
 
 func (x *TupleValue) ProtoReflect() protoreflect.Message {
-	mi := &file_tuple_value_proto_msgTypes[0]
+	mi := &file_tuple_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -57,7 +57,7 @@ func (x *TupleValue) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TupleValue.ProtoReflect.Descriptor instead.
 func (*TupleValue) Descriptor() ([]byte, []int) {
-	return file_tuple_value_proto_rawDescGZIP(), []int{0}
+	return file_tuple_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *TupleValue) GetValue() string {
@@ -78,7 +78,7 @@ type Tuple struct {
 func (x *Tuple) Reset() {
 	*x = Tuple{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_tuple_value_proto_msgTypes[1]
+		mi := &file_tuple_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -91,7 +91,7 @@ func (x *Tuple) String() string {
 func (*Tuple) ProtoMessage() {}
 
 func (x *Tuple) ProtoReflect() protoreflect.Message {
-	mi := &file_tuple_value_proto_msgTypes[1]
+	mi := &file_tuple_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -104,7 +104,7 @@ func (x *Tuple) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Tuple.ProtoReflect.Descriptor instead.
 func (*Tuple) Descriptor() ([]byte, []int) {
-	return file_tuple_value_proto_rawDescGZIP(), []int{1}
+	return file_tuple_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Tuple) GetData() []*TupleValue {
@@ -114,37 +114,37 @@ func (x *Tuple) GetData() []*TupleValue {
 	return nil
 }
 
-var File_tuple_value_proto protoreflect.FileDescriptor
+var File_tuple_proto protoreflect.FileDescriptor
 
-var file_tuple_value_proto_rawDesc = []byte{
-	0x0a, 0x11, 0x74, 0x75, 0x70, 0x6c, 0x65, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x2e, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x22, 0x22, 0x0a, 0x0a, 0x54, 0x75, 0x70, 0x6c, 0x65, 0x56, 0x61, 0x6c, 0x75,
-	0x65, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
-	0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0x28, 0x0a, 0x05, 0x54, 0x75, 0x70, 0x6c, 0x65,
-	0x12, 0x1f, 0x0a, 0x04, 0x64, 0x61, 0x74, 0x61, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x0b,
-	0x2e, 0x54, 0x75, 0x70, 0x6c, 0x65, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x52, 0x04, 0x64, 0x61, 0x74,
-	0x61, 0x42, 0x0c, 0x5a, 0x0a, 0x2e, 0x2e, 0x2f, 0x73, 0x74, 0x6f, 0x72, 0x61, 0x67, 0x65, 0x62,
-	0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+var file_tuple_proto_rawDesc = []byte{
+	0x0a, 0x0b, 0x74, 0x75, 0x70, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x22, 0x0a,
+	0x0a, 0x54, 0x75, 0x70, 0x6c, 0x65, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x76,
+	0x61, 0x6c, 0x75, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75,
+	0x65, 0x22, 0x28, 0x0a, 0x05, 0x54, 0x75, 0x70, 0x6c, 0x65, 0x12, 0x1f, 0x0a, 0x04, 0x64, 0x61,
+	0x74, 0x61, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x0b, 0x2e, 0x54, 0x75, 0x70, 0x6c, 0x65,
+	0x56, 0x61, 0x6c, 0x75, 0x65, 0x52, 0x04, 0x64, 0x61, 0x74, 0x61, 0x42, 0x0c, 0x5a, 0x0a, 0x2e,
+	0x2e, 0x2f, 0x73, 0x74, 0x6f, 0x72, 0x61, 0x67, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x33,
 }
 
 var (
-	file_tuple_value_proto_rawDescOnce sync.Once
-	file_tuple_value_proto_rawDescData = file_tuple_value_proto_rawDesc
+	file_tuple_proto_rawDescOnce sync.Once
+	file_tuple_proto_rawDescData = file_tuple_proto_rawDesc
 )
 
-func file_tuple_value_proto_rawDescGZIP() []byte {
-	file_tuple_value_proto_rawDescOnce.Do(func() {
-		file_tuple_value_proto_rawDescData = protoimpl.X.CompressGZIP(file_tuple_value_proto_rawDescData)
+func file_tuple_proto_rawDescGZIP() []byte {
+	file_tuple_proto_rawDescOnce.Do(func() {
+		file_tuple_proto_rawDescData = protoimpl.X.CompressGZIP(file_tuple_proto_rawDescData)
 	})
-	return file_tuple_value_proto_rawDescData
+	return file_tuple_proto_rawDescData
 }
 
-var file_tuple_value_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_tuple_value_proto_goTypes = []interface{}{
+var file_tuple_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_tuple_proto_goTypes = []interface{}{
 	(*TupleValue)(nil), // 0: TupleValue
 	(*Tuple)(nil),      // 1: Tuple
 }
-var file_tuple_value_proto_depIdxs = []int32{
+var file_tuple_proto_depIdxs = []int32{
 	0, // 0: Tuple.data:type_name -> TupleValue
 	1, // [1:1] is the sub-list for method output_type
 	1, // [1:1] is the sub-list for method input_type
@@ -153,13 +153,13 @@ var file_tuple_value_proto_depIdxs = []int32{
 	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_tuple_value_proto_init() }
-func file_tuple_value_proto_init() {
-	if File_tuple_value_proto != nil {
+func init() { file_tuple_proto_init() }
+func file_tuple_proto_init() {
+	if File_tuple_proto != nil {
 		return
 	}
 	if !protoimpl.UnsafeEnabled {
-		file_tuple_value_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+		file_tuple_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*TupleValue); i {
 			case 0:
 				return &v.state
@@ -171,7 +171,7 @@ func file_tuple_value_proto_init() {
 				return nil
 			}
 		}
-		file_tuple_value_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+		file_tuple_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Tuple); i {
 			case 0:
 				return &v.state
@@ -188,18 +188,18 @@ func file_tuple_value_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: file_tuple_value_proto_rawDesc,
+			RawDescriptor: file_tuple_proto_rawDesc,
 			NumEnums:      0,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_tuple_value_proto_goTypes,
-		DependencyIndexes: file_tuple_value_proto_depIdxs,
-		MessageInfos:      file_tuple_value_proto_msgTypes,
+		GoTypes:           file_tuple_proto_goTypes,
+		DependencyIndexes: file_tuple_proto_depIdxs,
+		MessageInfos:      file_tuple_proto_msgTypes,
 	}.Build()
-	File_tuple_value_proto = out.File
-	file_tuple_value_proto_rawDesc = nil
-	file_tuple_value_proto_goTypes = nil
-	file_tuple_value_proto_depIdxs = nil
+	File_tuple_proto = out.File
+	file_tuple_proto_rawDesc = nil
+	file_tuple_proto_goTypes = nil
+	file_tuple_proto_depIdxs = nil
 }
