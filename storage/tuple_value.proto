@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+option go_package = "../storage";
+
+message TupleValue{
+  string value = 1;
+}
+
+message Tuple {
+  repeated TupleValue data = 2;
+}
