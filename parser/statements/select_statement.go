@@ -37,18 +37,15 @@ func BuildSelectStmt(statement *sqlparser.Select) (*SelectStmt, error) {
 }
 
 func getTableNameFromTableExpr(from sqlparser.TableExpr) (string, error) {
-	switch from.(type) {
-	case *sqlparser.AliasedTableExpr:
+	if _, ok := from.(*sqlparser.AliasedTableExpr); ok {
 		aliasedTableExpr := from.(*sqlparser.AliasedTableExpr).Expr
-		switch aliasedTableExpr.(type) {
-		case sqlparser.TableName:
+		if _, ok2 := aliasedTableExpr.(sqlparser.TableName); ok2 {
 			return aliasedTableExpr.(sqlparser.TableName).Name.String(), nil
-		default:
+		} else {
 			return "", fmt.Errorf("not supported table expression type: %T", aliasedTableExpr)
 		}
-	default:
-		return "", fmt.Errorf("not supported table type: %T", from)
 	}
+	return "", fmt.Errorf("not supported table type: %T", from)
 }
 
 func getColumnNamesFromSelectExprs(selectExprs sqlparser.SelectExprs) ([]string, error) {
