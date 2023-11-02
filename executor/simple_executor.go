@@ -1,7 +1,8 @@
 package executor
 
 import (
-	"fmt"
+	// https://github.com/golangci/golangci-lint/issues/3815
+	"fmt" //nolint
 	"garakutadb/catalog"
 	"garakutadb/planner"
 	"garakutadb/storage"
