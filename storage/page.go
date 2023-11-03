@@ -12,7 +12,27 @@ const (
 type Page struct {
 	TableName string
 	Id        uint64
-	Tuples    [TupleNumPerPage]*Tuple
+	Tuples    Tuples
+}
+
+type Tuples [TupleNumPerPage]*Tuple
+
+func (t *Tuples) Insert(tuple *Tuple) {
+	for i, v := range t {
+		if v == nil || v.Data == nil {
+			t[i] = tuple
+			return
+		}
+	}
+}
+
+func (t *Tuples) IsFull() bool {
+	for _, tuple := range t {
+		if tuple == nil || tuple.Data == nil {
+			return false
+		}
+	}
+	return true
 }
 
 func NewPage(tableName string, id uint64, tuples [TupleNumPerPage]*Tuple) *Page {
@@ -27,6 +47,9 @@ func (p *Page) Serialize() ([PageByteSize]byte, error) {
 	pageBytes := [PageByteSize]byte{}
 
 	for i, t := range p.Tuples {
+		if t == nil || t.Data == nil {
+			break
+		}
 		b, err := proto.Marshal(t)
 		if err != nil {
 			return [PageByteSize]byte{}, err

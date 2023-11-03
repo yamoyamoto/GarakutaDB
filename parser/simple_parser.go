@@ -23,6 +23,8 @@ func (sp *SimpleParser) Parse(SqlString string) (Stmt, error) {
 	switch s := stmt.(type) {
 	case *sqlparser.Select:
 		return statements.BuildSelectStmt(s)
+	case *sqlparser.Insert:
+		return statements.BuildInsertStmt(s)
 	case *sqlparser.DDL:
 		return sp.parseDDLStatement(s)
 	default:
