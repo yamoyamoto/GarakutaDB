@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"github.com/cockroachdb/errors"
 	"os"
 )
 
@@ -22,7 +23,7 @@ func (d *DiskManager) makePageFilePath(tableName string, pageId uint64) string {
 func (d *DiskManager) ReadPage(tableName string, pageId uint64) (*Page, error) {
 	b, err := os.ReadFile(d.makePageFilePath(tableName, pageId))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to read page from disk")
 	}
 
 	var bytes [4096]byte

@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"fmt"
 	"garakutadb/parser/statements"
+	"github.com/cockroachdb/errors"
 	"github.com/xwb1989/sqlparser"
 )
 
@@ -16,13 +16,13 @@ func NewSimpleParser() *SimpleParser {
 func (sp *SimpleParser) Parse(SqlString string) (Stmt, error) {
 	stmt, err := sqlparser.Parse(SqlString)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to parse sql")
 	}
 
 	switch s := stmt.(type) {
 	case *sqlparser.Select:
 		return statements.BuildSelectStmt(s)
 	default:
-		return nil, fmt.Errorf("not supported: %T", s)
+		return nil, errors.Errorf("not supported: %T", s)
 	}
 }

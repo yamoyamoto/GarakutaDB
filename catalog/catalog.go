@@ -1,6 +1,6 @@
 package catalog
 
-import "errors"
+import "github.com/cockroachdb/errors"
 
 type Catalog struct {
 	TableSchemas TableSchemas

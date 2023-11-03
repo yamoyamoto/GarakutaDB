@@ -1,7 +1,7 @@
 package statements
 
 import (
-	"fmt"
+	"github.com/cockroachdb/errors"
 	"github.com/xwb1989/sqlparser"
 )
 
@@ -16,7 +16,7 @@ type SelectStmt struct {
 
 func BuildSelectStmt(statement *sqlparser.Select) (*SelectStmt, error) {
 	if len(statement.From) != 1 {
-		return nil, fmt.Errorf("only support one table. got: %d", len(statement.From))
+		return nil, errors.Errorf("only support one table. got: %d", len(statement.From))
 	}
 
 	from, err := getTableNameFromTableExpr(statement.From[0])
@@ -42,10 +42,10 @@ func getTableNameFromTableExpr(from sqlparser.TableExpr) (string, error) {
 		if _, ok2 := aliasedTableExpr.(sqlparser.TableName); ok2 {
 			return aliasedTableExpr.(sqlparser.TableName).Name.String(), nil
 		} else {
-			return "", fmt.Errorf("not supported table expression type: %T", aliasedTableExpr)
+			return "", errors.Errorf("not supported table expression type: %T", aliasedTableExpr)
 		}
 	}
-	return "", fmt.Errorf("not supported table type: %T", from)
+	return "", errors.Errorf("not supported table type: %T", from)
 }
 
 func getColumnNamesFromSelectExprs(selectExprs sqlparser.SelectExprs) ([]string, error) {
@@ -60,13 +60,13 @@ func getColumnNamesFromSelectExprs(selectExprs sqlparser.SelectExprs) ([]string,
 				columnNames = append(columnNames, colName)
 
 			default:
-				return nil, fmt.Errorf("not supported column expression type: %T", aliasedExpr.Expr)
+				return nil, errors.Errorf("not supported column expression type: %T", aliasedExpr.Expr)
 			}
 		case *sqlparser.StarExpr:
 			// '*' will be handled separately and specially
 			return nil, nil
 		default:
-			return nil, fmt.Errorf("not supported select expression type: %T", selectExpr)
+			return nil, errors.Errorf("not supported select expression type: %T", selectExpr)
 		}
 	}
 	return columnNames, nil

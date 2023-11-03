@@ -1,11 +1,10 @@
 package executor
 
 import (
-	// https://github.com/golangci/golangci-lint/issues/3815
-	"fmt" //nolint
 	"garakutadb/catalog"
 	"garakutadb/planner"
 	"garakutadb/storage"
+	"github.com/cockroachdb/errors"
 )
 
 type SimpleExecutor struct {
@@ -32,7 +31,7 @@ func (e *SimpleExecutor) Execute(pl planner.Plan) (*ResultSet, error) {
 	case *planner.SeqScanPlan:
 		return NewSeqScanExecutor(e.storage).Execute(*p)
 	default:
-		return nil, fmt.Errorf("not supported plan type: %T", p)
+		return nil, errors.Errorf("not supported plan type: %T", p)
 	}
 }
 

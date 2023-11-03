@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/cockroachdb/errors"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -29,7 +30,7 @@ func (p *Page) Serialize() ([PageByteSize]byte, error) {
 	for i, t := range p.Tuples {
 		b, err := proto.Marshal(t)
 		if err != nil {
-			return [PageByteSize]byte{}, err
+			return [PageByteSize]byte{}, errors.Wrap(err, "failed to serialize tuple")
 		}
 
 		copy(pageBytes[i*128:i*128+128], b)
@@ -57,7 +58,7 @@ func DeserializePage(tableName string, pageId uint64, pageBytes [PageByteSize]by
 		t := Tuple{}
 		err := proto.Unmarshal(pageBytes[i*128:i*128+byteLen], &t)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to deserialize tuple")
 		}
 
 		tuples[i] = &t

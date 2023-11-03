@@ -1,9 +1,9 @@
 package planner
 
 import (
-	"fmt"
 	"garakutadb/catalog"
 	"garakutadb/parser/statements"
+	"github.com/cockroachdb/errors"
 	"slices"
 )
 
@@ -12,7 +12,7 @@ type SelectPlan struct{}
 func BuildSelectPlan(ct *catalog.Catalog, selectStmt *statements.SelectStmt) (Plan, error) {
 	tableSchema, err := ct.TableSchemas.Get(selectStmt.From)
 	if err == catalog.TableSchemaNotFoundError {
-		return nil, fmt.Errorf("table not found: %s", selectStmt.From)
+		return nil, errors.Errorf("table not found: %s", selectStmt.From)
 	}
 	if err != nil {
 		return nil, err
@@ -26,7 +26,7 @@ func BuildSelectPlan(ct *catalog.Catalog, selectStmt *statements.SelectStmt) (Pl
 			columnNames = append(columnNames, col)
 			columnOrders = append(columnOrders, order)
 		} else {
-			return nil, fmt.Errorf("column not found: %s", col)
+			return nil, errors.Errorf("column not found: %s", col)
 		}
 	}
 
