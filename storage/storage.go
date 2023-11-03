@@ -1,5 +1,10 @@
 package storage
 
+import (
+	"encoding/json"
+	"os"
+)
+
 type Storage struct {
 	DiskManager *DiskManager
 }
@@ -36,4 +41,22 @@ func (it *PageIterator) Next() bool {
 	it.pageId++
 	it.Page = p
 	return true
+}
+
+func (st *Storage) ReadJson(path string, out interface{}) error {
+	jsonStr, err := os.ReadFile(st.DiskManager.makeGeneralFilePath(path))
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(jsonStr, out)
+}
+
+func (st *Storage) WriteJson(path string, in interface{}) error {
+	jsonStr, err := json.Marshal(in)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(st.DiskManager.makeGeneralFilePath(path), jsonStr, 0644)
 }
