@@ -32,6 +32,8 @@ func (e *SimpleExecutor) Execute(pl planner.Plan) (*ResultSet, error) {
 	switch p := pl.(type) {
 	case *planner.SeqScanPlan:
 		return NewSeqScanExecutor(e.storage).Execute(*p)
+	case *planner.InsertPlan:
+		return NewInsertExecutor(e.storage).Execute(*p)
 	case *planner.CreateTablePlan:
 		return NewCreateTableExecutor(e.catalog, e.storage).Execute(*p)
 	default:
@@ -96,5 +98,40 @@ func (e *CreateTableExecutor) Execute(pl planner.CreateTablePlan) (*ResultSet, e
 
 	return &ResultSet{
 		Message: "successfully created table!",
+	}, nil
+}
+
+type InsertExecutor struct {
+	storage *storage.Storage
+}
+
+func NewInsertExecutor(storage *storage.Storage) *InsertExecutor {
+	return &InsertExecutor{
+		storage: storage,
+	}
+}
+
+func (e *InsertExecutor) Execute(pl planner.InsertPlan) (*ResultSet, error) {
+	tupleValues := make([]*storage.TupleValue, pl.ColumnNum)
+	for i := uint64(0); i < pl.ColumnNum; i++ {
+		tupleValues[i] = &storage.TupleValue{
+			Value: "NULL", // TODO: support NULL
+		}
+	}
+
+	for _, order := range pl.ColumnOrders {
+		tupleValues[order] = &storage.TupleValue{
+			Value: pl.Values[order],
+		}
+	}
+
+	if err := e.storage.InsertTuple(pl.Into, &storage.Tuple{
+		Data: tupleValues,
+	}); err != nil {
+		return nil, err
+	}
+
+	return &ResultSet{
+		Message: "successfully inserted!",
 	}, nil
 }

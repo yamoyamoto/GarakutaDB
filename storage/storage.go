@@ -28,6 +28,7 @@ func (st *Storage) NewPageIterator(tableName string) *PageIterator {
 		diskManager: st.DiskManager,
 		tableName:   tableName,
 		pageId:      0,
+		Page:        NewPage(tableName, 0, [TupleNumPerPage]*Tuple{}),
 	}
 }
 
@@ -41,6 +42,29 @@ func (it *PageIterator) Next() bool {
 	it.pageId++
 	it.Page = p
 	return true
+}
+
+func (it *PageIterator) IsEnd() bool {
+	_, err := it.diskManager.ReadPage(it.tableName, it.pageId+1)
+	return err != nil
+}
+
+func (st *Storage) InsertTuple(tableName string, tuple *Tuple) error {
+	it := st.NewPageIterator(tableName)
+
+	for it.Next() {
+		if it.IsEnd() {
+			break
+		}
+	}
+
+	if it.Page.Tuples.IsFull() {
+		newPage := NewPage(tableName, it.pageId+1, [TupleNumPerPage]*Tuple{tuple})
+		return st.DiskManager.WritePage(newPage)
+	}
+
+	it.Page.Tuples.Insert(tuple)
+	return st.DiskManager.WritePage(it.Page)
 }
 
 func (st *Storage) ReadJson(path string, out interface{}) error {

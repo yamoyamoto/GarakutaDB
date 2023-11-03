@@ -22,6 +22,8 @@ func (p *SimplePlanner) MakePlan(stmt parser.Stmt) (Plan, error) {
 	switch s := stmt.(type) {
 	case *statements.SelectStmt:
 		return BuildSelectPlan(p.catalog, s)
+	case *statements.InsertStmt:
+		return BuildInsertPlan(p.catalog, s)
 	case *ddl.CreateTableStmt:
 		return BuildCreateTablePlan(p.catalog, s)
 	default:
