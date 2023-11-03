@@ -23,14 +23,17 @@ func NewSimpleExecutor(ct *catalog.Catalog, st *storage.Storage) *SimpleExecutor
 // ResultSet
 // TODO: Create a new package and move this?
 type ResultSet struct {
-	Header []string
-	Rows   [][]string
+	Header  []string
+	Rows    [][]string
+	Message string
 }
 
 func (e *SimpleExecutor) Execute(pl planner.Plan) (*ResultSet, error) {
 	switch p := pl.(type) {
 	case *planner.SeqScanPlan:
 		return NewSeqScanExecutor(e.storage).Execute(*p)
+	case *planner.CreateTablePlan:
+		return NewCreateTableExecutor(e.catalog, e.storage).Execute(*p)
 	default:
 		return nil, fmt.Errorf("not supported plan type: %T", p)
 	}
@@ -71,5 +74,27 @@ func (e *SeqScanExecutor) Execute(pl planner.SeqScanPlan) (*ResultSet, error) {
 	return &ResultSet{
 		Header: pl.ColumnNames,
 		Rows:   rows,
+	}, nil
+}
+
+type CreateTableExecutor struct {
+	storage *storage.Storage
+	catalog *catalog.Catalog
+}
+
+func NewCreateTableExecutor(ct *catalog.Catalog, st *storage.Storage) *CreateTableExecutor {
+	return &CreateTableExecutor{
+		storage: st,
+		catalog: ct,
+	}
+}
+
+func (e *CreateTableExecutor) Execute(pl planner.CreateTablePlan) (*ResultSet, error) {
+	if err := e.catalog.Add(pl.TableSchema); err != nil {
+		return nil, err
+	}
+
+	return &ResultSet{
+		Message: "successfully created table!",
 	}, nil
 }
