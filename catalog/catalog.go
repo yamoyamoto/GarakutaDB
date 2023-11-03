@@ -21,7 +21,7 @@ const catalogPath = "table_schema.json"
 
 func LoadCatalog(storage *storage.Storage) (*Catalog, error) {
 	tableSchemas := TableSchemas{}
-	if err := storage.ReadJson(catalogPath, tableSchemas); err != nil {
+	if err := storage.ReadJson(catalogPath, &tableSchemas); err != nil {
 		return nil, err
 	}
 
@@ -57,7 +57,7 @@ func (ct *Catalog) Delete(name string) error {
 }
 
 func (ct *Catalog) save() error {
-	return ct.storage.WriteJson(catalogPath, ct.TableSchemas)
+	return ct.storage.WriteJson(catalogPath, &ct.TableSchemas)
 }
 
 type TableSchemas []TableSchema
