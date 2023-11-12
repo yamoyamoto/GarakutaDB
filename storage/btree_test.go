@@ -49,9 +49,9 @@ func TestNodeStructure(t *testing.T) {
 	}
 
 	/*
-			 b
-		   b    f
-		  a c  e g
+		          b
+			   b     f
+			  a c   e g
 	*/
 	assert.Len(t, btree.Top.Items, 1)
 	assert.Len(t, btree.Top.Children, 2)
