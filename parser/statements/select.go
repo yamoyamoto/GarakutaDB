@@ -2,6 +2,7 @@ package statements
 
 import (
 	"fmt"
+	"garakutadb/expression"
 	"github.com/xwb1989/sqlparser"
 )
 
@@ -12,6 +13,12 @@ type SelectStmt struct {
 	ColumnNames []string
 
 	IsAllColumns bool
+
+	Where *Where
+}
+
+type Where struct {
+	Expression expression.Expression
 }
 
 func BuildSelectStmt(statement *sqlparser.Select) (*SelectStmt, error) {
@@ -29,10 +36,19 @@ func BuildSelectStmt(statement *sqlparser.Select) (*SelectStmt, error) {
 		return nil, err
 	}
 
+	var whereExpression expression.Expression
+	if statement.Where != nil {
+		whereExpression, err = expression.GetWhereFromWhereExpr(statement.Where)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &SelectStmt{
 		From:         from,
 		ColumnNames:  columnNames,
 		IsAllColumns: isAllColumns(statement.SelectExprs),
+		Where:        &Where{Expression: whereExpression},
 	}, nil
 }
 

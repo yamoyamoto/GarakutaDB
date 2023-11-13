@@ -3,6 +3,7 @@ package planner
 import (
 	"fmt"
 	"garakutadb/catalog"
+	"garakutadb/expression"
 	"garakutadb/parser/statements"
 	"slices"
 )
@@ -30,6 +31,11 @@ func BuildSelectPlan(ct *catalog.Catalog, selectStmt *statements.SelectStmt) (Pl
 		}
 	}
 
+	var whereExpression expression.Expression
+	if selectStmt.Where != nil {
+		whereExpression = selectStmt.Where.Expression
+	}
+
 	if selectStmt.IsAllColumns {
 		for order, col := range tableSchema.Columns {
 			if !slices.Contains(columnNames, col.Name) {
@@ -40,8 +46,9 @@ func BuildSelectPlan(ct *catalog.Catalog, selectStmt *statements.SelectStmt) (Pl
 	}
 
 	return &SeqScanPlan{
-		TableName:    tableSchema.Name,
-		ColumnNames:  columnNames,
-		ColumnOrders: columnOrders,
+		TableName:       tableSchema.Name,
+		ColumnNames:     columnNames,
+		ColumnOrders:    columnOrders,
+		WhereExpression: whereExpression,
 	}, nil
 }
