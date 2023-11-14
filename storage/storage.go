@@ -65,7 +65,7 @@ func (st *Storage) WriteIndex(btree *BTree) error {
 	return st.diskManager.WriteIndex(btree)
 }
 
-func (st *Storage) InsertTuple(tableName string, tuple *Tuple) error {
+func (st *Storage) InsertTuple(tableName string, tuple *Tuple) (*Page, error) {
 	it := st.NewPageIterator(tableName)
 
 	for it.Next() {
@@ -76,11 +76,11 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple) error {
 
 	if it.Page.Tuples.IsFull() {
 		newPage := NewPage(tableName, it.pageId+1, [TupleNumPerPage]*Tuple{tuple})
-		return st.diskManager.WritePage(newPage)
+		return nil, st.diskManager.WritePage(newPage)
 	}
 
 	it.Page.Tuples.Insert(tuple)
-	return st.diskManager.WritePage(it.Page)
+	return it.Page, st.diskManager.WritePage(it.Page)
 }
 
 func (st *Storage) ReadJson(path string, out interface{}) error {

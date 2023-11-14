@@ -3,6 +3,8 @@ package storage
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -165,15 +167,15 @@ func (b *BTree) Insert(itm *StringItem) error {
 	return nil
 }
 
-func (n *Node) search(item Item) (Item, bool) {
+func (n *Node) search(item *StringItem) (*StringItem, bool) {
 	for i, itm := range n.Items {
 		if item.Less(itm) {
 			if len(n.Children) == 0 {
 				return nil, false
 			}
 			return n.Children[i].search(item)
-		} else if itm == item {
-			return itm, true
+		} else if itm.Value == item.Value {
+			return &itm, true
 		}
 	}
 
@@ -184,7 +186,7 @@ func (n *Node) search(item Item) (Item, bool) {
 	return nil, false
 }
 
-func (b *BTree) Search(item Item) (Item, bool) {
+func (b *BTree) Search(item *StringItem) (*StringItem, bool) {
 	b.Mutex.RLock()
 	defer b.Mutex.RUnlock()
 
@@ -193,4 +195,26 @@ func (b *BTree) Search(item Item) (Item, bool) {
 	}
 
 	return b.Top.search(item)
+}
+
+func (n *Node) printNode(indent int) {
+	// 各ノードのアイテムをインデントして表示
+	indentStr := strings.Repeat(" ", indent)
+	fmt.Printf("%sNode Items: %v\n", indentStr, n.Items)
+
+	// 子ノードを再帰的に表示
+	for _, child := range n.Children {
+		child.printNode(indent + 2)
+	}
+}
+
+func (b *BTree) PrintTree() {
+	b.Mutex.RLock()
+	defer b.Mutex.RUnlock()
+
+	if b.Top != nil {
+		b.Top.printNode(0)
+	} else {
+		fmt.Println("Tree is empty")
+	}
 }

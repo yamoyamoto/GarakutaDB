@@ -139,7 +139,7 @@ func (e *IndexScanExecutor) Execute(pl planner.IndexScanPlan) (*ResultSet, error
 		return nil, err
 	}
 
-	item, found := btree.Search(storage.StringItem{
+	item, found := btree.Search(&storage.StringItem{
 		Value: pl.SearchKey,
 	})
 
@@ -219,14 +219,10 @@ func (e *InsertExecutor) Execute(pl planner.InsertPlan) (*ResultSet, error) {
 		return nil, err
 	}
 
-	if err := btree.Insert(&storage.StringItem{
+	if _, found := btree.Search(&storage.StringItem{
 		Value: pl.PKValue,
-	}); err != nil {
-		return nil, err
-	}
-
-	if err := e.storage.WriteIndex(btree); err != nil {
-		return nil, err
+	}); found {
+		return nil, fmt.Errorf("duplicate key value violates unique constraint")
 	}
 
 	// save row
@@ -243,9 +239,21 @@ func (e *InsertExecutor) Execute(pl planner.InsertPlan) (*ResultSet, error) {
 		}
 	}
 
-	if err := e.storage.InsertTuple(pl.Into, &storage.Tuple{
+	page, err := e.storage.InsertTuple(pl.Into, &storage.Tuple{
 		Data: tupleValues,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := btree.Insert(&storage.StringItem{
+		Value:  pl.PKValue,
+		PageId: page.Id,
 	}); err != nil {
+		return nil, err
+	}
+
+	if err := e.storage.WriteIndex(btree); err != nil {
 		return nil, err
 	}
 
