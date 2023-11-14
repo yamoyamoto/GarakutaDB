@@ -26,7 +26,7 @@ func TestInsert(t *testing.T) {
 	}
 
 	for _, item := range items {
-		foundItem, ok := btree.Search(item)
+		foundItem, ok := btree.Search(&item)
 		if !ok {
 			assert.Error(t, fmt.Errorf("failed to find item %#v", item))
 		}
@@ -111,7 +111,7 @@ func TestSearch(t *testing.T) {
 	}
 
 	for _, item := range items {
-		foundItem, ok := btree.Search(item)
+		foundItem, ok := btree.Search(&item)
 		if !ok {
 			assert.Error(t, fmt.Errorf("failed to find item %#v", item))
 		}
