@@ -2,7 +2,7 @@ package storage
 
 type StringItem struct {
 	Value  string
-	PageId int64
+	PageId uint64
 	Delete bool
 }
 
@@ -10,7 +10,7 @@ type Item interface {
 	Less(itm Item) bool
 	Equal(itm Item) bool
 	IsSkip() bool
-	GetPageId() int64
+	GetPageId() uint64
 }
 
 func (s StringItem) Less(itm Item) bool {
@@ -33,12 +33,13 @@ func (s StringItem) IsSkip() bool {
 	return s.Delete
 }
 
-func (s StringItem) GetPageId() int64 {
+func (s StringItem) GetPageId() uint64 {
 	if s.Delete {
-		return -1
+		return 0
 	}
 	if s.PageId == 0 {
-		return -1
+		return 0
 	}
+
 	return s.PageId
 }

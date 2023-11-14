@@ -8,7 +8,7 @@ import (
 )
 
 func TestInsert(t *testing.T) {
-	btree := storage.NewBTree()
+	btree := storage.NewBTree("test_table", "id")
 	items := []storage.StringItem{
 		{Value: "c", PageId: 0},
 		{Value: "a", PageId: 0},
@@ -20,7 +20,9 @@ func TestInsert(t *testing.T) {
 	}
 
 	for _, item := range items {
-		btree.Insert(item)
+		if err := btree.Insert(&item); err != nil {
+			assert.Nil(t, err)
+		}
 	}
 
 	for _, item := range items {
@@ -33,7 +35,7 @@ func TestInsert(t *testing.T) {
 }
 
 func TestNodeStructure(t *testing.T) {
-	btree := storage.NewBTree()
+	btree := storage.NewBTree("test_table", "id")
 	items := []storage.StringItem{
 		{Value: "c", PageId: 0},
 		{Value: "a", PageId: 0},
@@ -45,7 +47,9 @@ func TestNodeStructure(t *testing.T) {
 	}
 
 	for _, item := range items {
-		btree.Insert(item)
+		if err := btree.Insert(&item); err != nil {
+			assert.Nil(t, err)
+		}
 	}
 
 	/*
@@ -89,7 +93,7 @@ func TestNodeStructure(t *testing.T) {
 
 // BTreeの検索機能テスト
 func TestSearch(t *testing.T) {
-	btree := storage.NewBTree()
+	btree := storage.NewBTree("test_table", "id")
 	items := []storage.StringItem{
 		{Value: "c", PageId: 0},
 		{Value: "a", PageId: 0},
@@ -101,7 +105,9 @@ func TestSearch(t *testing.T) {
 	}
 
 	for _, item := range items {
-		btree.Insert(item)
+		if err := btree.Insert(&item); err != nil {
+			assert.Nil(t, err)
+		}
 	}
 
 	for _, item := range items {
@@ -114,7 +120,7 @@ func TestSearch(t *testing.T) {
 }
 
 func TestBalance(t *testing.T) {
-	btree := storage.NewBTree()
+	btree := storage.NewBTree("test_table", "id")
 	items := []storage.StringItem{
 		{Value: "c", PageId: 0},
 		{Value: "a", PageId: 0},
@@ -126,7 +132,9 @@ func TestBalance(t *testing.T) {
 	}
 
 	for _, item := range items {
-		btree.Insert(item)
+		if err := btree.Insert(&item); err != nil {
+			assert.Nil(t, err)
+		}
 	}
 
 	assert.True(t, isBalanced(btree.Top))
