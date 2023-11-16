@@ -34,8 +34,10 @@ func (e *SimpleExecutor) Execute(pl planner.Plan) (*ResultSet, error) {
 	switch p := pl.(type) {
 	case *planner.SeqScanPlan:
 		return NewSeqScanExecutor(e.storage).Execute(*p)
+	case *planner.IndexScanPlan:
+		return NewIndexScanExecutor(e.storage).Execute(*p)
 	case *planner.InsertPlan:
-		return NewInsertExecutor(e.storage).Execute(*p)
+		return NewInsertExecutor(e.catalog, e.storage).Execute(*p)
 	case *planner.CreateTablePlan:
 		return NewCreateTableExecutor(e.catalog, e.storage).Execute(*p)
 	default:
@@ -121,6 +123,56 @@ func evalWhere(expr expression.Expression, row []string, pl *planner.SeqScanPlan
 	}
 }
 
+type IndexScanExecutor struct {
+	storage *storage.Storage
+}
+
+func NewIndexScanExecutor(storage *storage.Storage) *IndexScanExecutor {
+	return &IndexScanExecutor{
+		storage: storage,
+	}
+}
+
+func (e *IndexScanExecutor) Execute(pl planner.IndexScanPlan) (*ResultSet, error) {
+	btree, err := e.storage.ReadIndex(pl.TableName, pl.IndexName)
+	if err != nil {
+		return nil, err
+	}
+
+	item, found := btree.Search(&storage.StringItem{
+		Value: pl.SearchKey,
+	})
+
+	if !found {
+		return &ResultSet{
+			Message: "rows was not found",
+		}, nil
+	}
+
+	page, err := e.storage.ReadPage(pl.TableName, item.GetPageId())
+	if err != nil {
+		return nil, err
+	}
+
+	rows := make([][]string, 0)
+	for _, tuple := range page.Tuples {
+		if len(tuple.Data) == 0 {
+			continue
+		}
+		row := make([]string, 0)
+		for _, columnOrder := range pl.ColumnOrders {
+			row = append(row, tuple.Data[columnOrder].Value)
+		}
+		rows = append(rows, row)
+		break
+	}
+
+	return &ResultSet{
+		Header: pl.ColumnNames,
+		Rows:   rows,
+	}, nil
+}
+
 type CreateTableExecutor struct {
 	storage *storage.Storage
 	catalog *catalog.Catalog
@@ -145,15 +197,35 @@ func (e *CreateTableExecutor) Execute(pl planner.CreateTablePlan) (*ResultSet, e
 
 type InsertExecutor struct {
 	storage *storage.Storage
+	catalog *catalog.Catalog
 }
 
-func NewInsertExecutor(storage *storage.Storage) *InsertExecutor {
+func NewInsertExecutor(catalog *catalog.Catalog, storage *storage.Storage) *InsertExecutor {
 	return &InsertExecutor{
 		storage: storage,
+		catalog: catalog,
 	}
 }
 
 func (e *InsertExecutor) Execute(pl planner.InsertPlan) (*ResultSet, error) {
+	tableSchema, err := e.catalog.TableSchemas.Get(pl.Into)
+	if err != nil {
+		return nil, err
+	}
+
+	// save index
+	btree, err := e.storage.ReadIndex(pl.Into, tableSchema.PK)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, found := btree.Search(&storage.StringItem{
+		Value: pl.PKValue,
+	}); found {
+		return nil, fmt.Errorf("duplicate key value violates unique constraint")
+	}
+
+	// save row
 	tupleValues := make([]*storage.TupleValue, pl.ColumnNum)
 	for i := uint64(0); i < pl.ColumnNum; i++ {
 		tupleValues[i] = &storage.TupleValue{
@@ -167,9 +239,21 @@ func (e *InsertExecutor) Execute(pl planner.InsertPlan) (*ResultSet, error) {
 		}
 	}
 
-	if err := e.storage.InsertTuple(pl.Into, &storage.Tuple{
+	page, err := e.storage.InsertTuple(pl.Into, &storage.Tuple{
 		Data: tupleValues,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := btree.Insert(&storage.StringItem{
+		Value:  pl.PKValue,
+		PageId: page.Id,
 	}); err != nil {
+		return nil, err
+	}
+
+	if err := e.storage.WriteIndex(btree); err != nil {
 		return nil, err
 	}
 

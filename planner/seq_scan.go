@@ -9,5 +9,10 @@ type SeqScanPlan struct {
 	WhereExpression expression.Expression
 }
 
-type FilterPlan struct {
+type IndexScanPlan struct {
+	TableName    string
+	ColumnNames  []string
+	ColumnOrders []uint64
+	SearchKey    string
+	IndexName    string
 }

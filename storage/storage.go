@@ -6,12 +6,12 @@ import (
 )
 
 type Storage struct {
-	DiskManager *DiskManager
+	diskManager *DiskManager
 }
 
 func NewStorage(diskManager *DiskManager) *Storage {
 	return &Storage{
-		DiskManager: diskManager,
+		diskManager: diskManager,
 	}
 }
 
@@ -25,10 +25,10 @@ type PageIterator struct {
 
 func (st *Storage) NewPageIterator(tableName string) *PageIterator {
 	return &PageIterator{
-		diskManager: st.DiskManager,
+		diskManager: st.diskManager,
 		tableName:   tableName,
-		pageId:      0,
-		Page:        NewPage(tableName, 0, [TupleNumPerPage]*Tuple{}),
+		pageId:      1,
+		Page:        NewPage(tableName, 1, [TupleNumPerPage]*Tuple{}),
 	}
 }
 
@@ -49,7 +49,23 @@ func (it *PageIterator) IsEnd() bool {
 	return err != nil
 }
 
-func (st *Storage) InsertTuple(tableName string, tuple *Tuple) error {
+func (st *Storage) ReadPage(tableName string, pageId uint64) (*Page, error) {
+	return st.diskManager.ReadPage(tableName, pageId)
+}
+
+func (st *Storage) WritePage(page *Page) error {
+	return st.diskManager.WritePage(page)
+}
+
+func (st *Storage) ReadIndex(tableName string, indexName string) (*BTree, error) {
+	return st.diskManager.ReadIndex(tableName, indexName)
+}
+
+func (st *Storage) WriteIndex(btree *BTree) error {
+	return st.diskManager.WriteIndex(btree)
+}
+
+func (st *Storage) InsertTuple(tableName string, tuple *Tuple) (*Page, error) {
 	it := st.NewPageIterator(tableName)
 
 	for it.Next() {
@@ -60,15 +76,15 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple) error {
 
 	if it.Page.Tuples.IsFull() {
 		newPage := NewPage(tableName, it.pageId+1, [TupleNumPerPage]*Tuple{tuple})
-		return st.DiskManager.WritePage(newPage)
+		return nil, st.diskManager.WritePage(newPage)
 	}
 
 	it.Page.Tuples.Insert(tuple)
-	return st.DiskManager.WritePage(it.Page)
+	return it.Page, st.diskManager.WritePage(it.Page)
 }
 
 func (st *Storage) ReadJson(path string, out interface{}) error {
-	jsonStr, err := os.ReadFile(st.DiskManager.makeGeneralFilePath(path))
+	jsonStr, err := os.ReadFile(st.diskManager.makeGeneralFilePath(path))
 	if err != nil {
 		return err
 	}
@@ -82,5 +98,5 @@ func (st *Storage) WriteJson(path string, in interface{}) error {
 		return err
 	}
 
-	return os.WriteFile(st.DiskManager.makeGeneralFilePath(path), jsonStr, 0644)
+	return os.WriteFile(st.diskManager.makeGeneralFilePath(path), jsonStr, 0644)
 }

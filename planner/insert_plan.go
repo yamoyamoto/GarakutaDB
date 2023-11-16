@@ -12,6 +12,7 @@ type InsertPlan struct {
 	ColumnOrders []uint64
 	Values       []string
 	ColumnNum    uint64
+	PKValue      string
 }
 
 func BuildInsertPlan(ct *catalog.Catalog, insertStmt *statements.InsertStmt) (Plan, error) {
@@ -26,6 +27,7 @@ func BuildInsertPlan(ct *catalog.Catalog, insertStmt *statements.InsertStmt) (Pl
 	columnNames := make([]string, 0)
 	columnOrders := make([]uint64, 0)
 	columnValues := make([]string, 0)
+	pkValue := ""
 	if len(insertStmt.ColumnNames) == 0 {
 		for order, col := range tableSchema.Columns {
 			columnNames = append(columnNames, col.Name)
@@ -43,6 +45,10 @@ func BuildInsertPlan(ct *catalog.Catalog, insertStmt *statements.InsertStmt) (Pl
 				columnNames = append(columnNames, col)
 				columnOrders = append(columnOrders, order)
 				columnValues = append(columnValues, insertStmt.Values[order])
+
+				if col == tableSchema.PK {
+					pkValue = insertStmt.Values[order]
+				}
 			} else {
 				return nil, fmt.Errorf("column not found: %s", col)
 			}
@@ -55,5 +61,6 @@ func BuildInsertPlan(ct *catalog.Catalog, insertStmt *statements.InsertStmt) (Pl
 		ColumnOrders: columnOrders,
 		Values:       columnValues,
 		ColumnNum:    uint64(len(tableSchema.Columns)),
+		PKValue:      pkValue,
 	}, nil
 }
