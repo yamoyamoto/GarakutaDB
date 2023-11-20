@@ -33,7 +33,7 @@ func (s StringItem) IsSkip() bool {
 	return s.Delete
 }
 
-func (s StringItem) GetPageId() uint64 {
+func (s StringItem) GetPageId() PageId {
 	if s.Delete {
 		return 0
 	}
@@ -41,5 +41,5 @@ func (s StringItem) GetPageId() uint64 {
 		return 0
 	}
 
-	return s.PageId
+	return PageId(s.PageId)
 }
