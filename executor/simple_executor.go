@@ -253,7 +253,7 @@ func (e *InsertExecutor) Execute(pl planner.InsertPlan) (*ResultSet, error) {
 
 	if err := btree.Insert(&storage.StringItem{
 		Value:  pl.PKValue,
-		PageId: storage.PageId(page.Id),
+		PageId: page.Id,
 	}); err != nil {
 		return nil, err
 	}
