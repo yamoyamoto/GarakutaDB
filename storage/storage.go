@@ -18,11 +18,12 @@ func NewStorage(diskManager *DiskManager) *Storage {
 type PageIterator struct {
 	diskManager *DiskManager
 	tableName   string
-	pageId      uint64
+	pageId      PageId
 
 	Page *Page
 }
 
+// TODO: change to tuple iterator
 func (st *Storage) NewPageIterator(tableName string) *PageIterator {
 	return &PageIterator{
 		diskManager: st.diskManager,
@@ -49,7 +50,7 @@ func (it *PageIterator) IsEnd() bool {
 	return err != nil
 }
 
-func (st *Storage) ReadPage(tableName string, pageId uint64) (*Page, error) {
+func (st *Storage) ReadPage(tableName string, pageId PageId) (*Page, error) {
 	return st.diskManager.ReadPage(tableName, pageId)
 }
 
@@ -75,7 +76,7 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple) (*Page, error) {
 	}
 
 	if it.Page.Tuples.IsFull() {
-		newPage := NewPage(tableName, it.pageId+1, [TupleNumPerPage]*Tuple{tuple})
+		newPage := NewPage(tableName, PageId(it.pageId+1), [TupleNumPerPage]*Tuple{tuple})
 		return nil, st.diskManager.WritePage(newPage)
 	}
 
