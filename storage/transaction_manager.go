@@ -20,6 +20,7 @@ func NewTransactionManager() *TransactionManager {
 		transactions:   make(map[TransactionId]*Transaction, 0),
 		sharedLocks:    make(map[PageId][]TransactionId, 0),
 		exclusiveLocks: make(map[PageId]TransactionId, 0),
+		mutex:          new(sync.Mutex),
 	}
 }
 
