@@ -7,7 +7,6 @@ import (
 	"garakutadb/expression"
 	"garakutadb/planner"
 	"garakutadb/storage"
-	"log"
 )
 
 type SimpleExecutor struct {
@@ -30,14 +29,14 @@ type ResultSet struct {
 	Message string
 }
 
-func (e *SimpleExecutor) Execute(pl planner.Plan) (*ResultSet, error) {
+func (e *SimpleExecutor) Execute(pl planner.Plan, transaction *storage.Transaction) (*ResultSet, error) {
 	switch p := pl.(type) {
 	case *planner.SeqScanPlan:
-		return NewSeqScanExecutor(e.storage).Execute(*p)
+		return NewSeqScanExecutor(e.storage, transaction).Execute(*p)
 	case *planner.IndexScanPlan:
-		return NewIndexScanExecutor(e.storage).Execute(*p)
+		return NewIndexScanExecutor(e.storage, transaction).Execute(*p)
 	case *planner.InsertPlan:
-		return NewInsertExecutor(e.catalog, e.storage).Execute(*p)
+		return NewInsertExecutor(e.catalog, e.storage, transaction).Execute(*p)
 	case *planner.CreateTablePlan:
 		return NewCreateTableExecutor(e.catalog, e.storage).Execute(*p)
 	default:
@@ -46,60 +45,57 @@ func (e *SimpleExecutor) Execute(pl planner.Plan) (*ResultSet, error) {
 }
 
 type SeqScanExecutor struct {
-	storage *storage.Storage
+	storage     *storage.Storage
+	transaction *storage.Transaction
 }
 
-func NewSeqScanExecutor(storage *storage.Storage) *SeqScanExecutor {
+func NewSeqScanExecutor(storage *storage.Storage, transaction *storage.Transaction) *SeqScanExecutor {
 	return &SeqScanExecutor{
-		storage: storage,
+		storage:     storage,
+		transaction: transaction,
 	}
 }
 
 func (e *SeqScanExecutor) Execute(pl planner.SeqScanPlan) (*ResultSet, error) {
-	it := e.storage.NewPageIterator(pl.TableName)
-
-	pages := make([]*storage.Page, 0)
-	for it.Next() {
-		pages = append(pages, it.Page)
-	}
+	it := e.storage.NewTupleIterator(pl.TableName, e.transaction)
 
 	columnNameAndOrderMap := make(map[string]uint64)
 	for order, columnName := range pl.ColumnNames {
 		columnNameAndOrderMap[columnName] = uint64(order)
 	}
 
-	rows := make([][]string, 0)
-	for _, page := range pages {
-		for _, tuple := range page.Tuples {
-			if len(tuple.Data) == 0 {
-				continue
-			}
-			row := make([]string, 0)
-			for _, columnOrder := range pl.ColumnOrders {
-				row = append(row, tuple.Data[columnOrder].Value)
-			}
-			rows = append(rows, row)
+	filteredRows := make([][]string, 0)
+	for true {
+		tuple, found := it.Next()
+		if !found {
+			break
 		}
-	}
 
-	if pl.WhereExpression != nil {
-		filteredRows := make([][]string, 0)
-		for _, row := range rows {
+		if len(tuple.Data) == 0 {
+			continue
+		}
+
+		row := make([]string, 0)
+		for _, columnOrder := range pl.ColumnOrders {
+			row = append(row, tuple.Data[columnOrder].Value)
+		}
+
+		if pl.WhereExpression != nil {
 			evalResult, err := evalWhere(pl.WhereExpression, row, &pl, columnNameAndOrderMap)
 			if err != nil {
 				return nil, err
 			}
-			log.Println("evalResult", evalResult)
 			if evalResult {
 				filteredRows = append(filteredRows, row)
 			}
+		} else {
+			filteredRows = append(filteredRows, row)
 		}
-		rows = filteredRows
 	}
 
 	return &ResultSet{
 		Header: pl.ColumnNames,
-		Rows:   rows,
+		Rows:   filteredRows,
 	}, nil
 }
 
@@ -124,12 +120,14 @@ func evalWhere(expr expression.Expression, row []string, pl *planner.SeqScanPlan
 }
 
 type IndexScanExecutor struct {
-	storage *storage.Storage
+	storage     *storage.Storage
+	transaction *storage.Transaction
 }
 
-func NewIndexScanExecutor(storage *storage.Storage) *IndexScanExecutor {
+func NewIndexScanExecutor(storage *storage.Storage, transaction *storage.Transaction) *IndexScanExecutor {
 	return &IndexScanExecutor{
-		storage: storage,
+		storage:     storage,
+		transaction: transaction,
 	}
 }
 
@@ -159,6 +157,11 @@ func (e *IndexScanExecutor) Execute(pl planner.IndexScanPlan) (*ResultSet, error
 		if len(tuple.Data) == 0 {
 			continue
 		}
+
+		if tuple.Data[0].Value != pl.SearchKey {
+			continue
+		}
+
 		row := make([]string, 0)
 		for _, columnOrder := range pl.ColumnOrders {
 			row = append(row, tuple.Data[columnOrder].Value)
@@ -196,14 +199,16 @@ func (e *CreateTableExecutor) Execute(pl planner.CreateTablePlan) (*ResultSet, e
 }
 
 type InsertExecutor struct {
-	storage *storage.Storage
-	catalog *catalog.Catalog
+	storage     *storage.Storage
+	catalog     *catalog.Catalog
+	transaction *storage.Transaction
 }
 
-func NewInsertExecutor(catalog *catalog.Catalog, storage *storage.Storage) *InsertExecutor {
+func NewInsertExecutor(catalog *catalog.Catalog, storage *storage.Storage, transaction *storage.Transaction) *InsertExecutor {
 	return &InsertExecutor{
-		storage: storage,
-		catalog: catalog,
+		storage:     storage,
+		catalog:     catalog,
+		transaction: transaction,
 	}
 }
 
@@ -241,7 +246,7 @@ func (e *InsertExecutor) Execute(pl planner.InsertPlan) (*ResultSet, error) {
 
 	page, err := e.storage.InsertTuple(pl.Into, &storage.Tuple{
 		Data: tupleValues,
-	})
+	}, e.transaction)
 	if err != nil {
 		return nil, err
 	}

@@ -16,38 +16,81 @@ func NewStorage(diskManager *DiskManager) *Storage {
 }
 
 type PageIterator struct {
-	diskManager *DiskManager
-	tableName   string
-	pageId      PageId
+	diskManager        *DiskManager
+	tableName          string
+	pageIteratorCursor *PageIteratorCursor
 
-	Page *Page
+	Page        *Page
+	transaction *Transaction
 }
 
-// TODO: change to tuple iterator
-func (st *Storage) NewPageIterator(tableName string) *PageIterator {
-	return &PageIterator{
-		diskManager: st.diskManager,
-		tableName:   tableName,
-		pageId:      1,
-		Page:        NewPage(tableName, 1, [TupleNumPerPage]*Tuple{}),
+type PageIteratorCursor struct {
+	pageId      PageId
+	tupleOffset uint8
+}
+
+func NewPageIteratorCursor(pageId PageId) *PageIteratorCursor {
+	return &PageIteratorCursor{
+		pageId:      pageId,
+		tupleOffset: 0,
 	}
 }
 
-func (it *PageIterator) Next() bool {
-	p, err := it.diskManager.ReadPage(it.tableName, it.pageId)
+func (it *PageIteratorCursor) Next() bool {
+	it.tupleOffset++
+	if it.tupleOffset >= TupleNumPerPage {
+		it.pageId++
+		it.tupleOffset = 0
+		return true
+	}
+	return false
+}
+
+func (st *Storage) NewTupleIterator(tableName string, transaction *Transaction) *PageIterator {
+	return &PageIterator{
+		diskManager:        st.diskManager,
+		tableName:          tableName,
+		pageIteratorCursor: NewPageIteratorCursor(1),
+
+		Page:        nil,
+		transaction: transaction,
+	}
+}
+
+func (it *PageIterator) Next() (*Tuple, bool) {
+	if it.Page == nil {
+		p, err := it.diskManager.ReadPage(it.tableName, it.pageIteratorCursor.pageId)
+		if err != nil {
+			return nil, false
+		}
+		it.Page = p
+		if p.Tuples[0] == nil {
+			return nil, false
+		} else {
+			return p.Tuples[0], true
+		}
+	}
+
+	isNextPage := it.pageIteratorCursor.Next()
+	if !isNextPage {
+		if it.Page.Tuples[it.pageIteratorCursor.tupleOffset] == nil {
+			return nil, false
+		} else {
+			return it.Page.Tuples[it.pageIteratorCursor.tupleOffset], true
+		}
+	}
+
+	p, err := it.diskManager.ReadPage(it.tableName, it.pageIteratorCursor.pageId)
 	// TODO: add page not found case
 	if err != nil {
-		return false
+		return nil, false
 	}
-
-	it.pageId++
 	it.Page = p
-	return true
-}
 
-func (it *PageIterator) IsEnd() bool {
-	_, err := it.diskManager.ReadPage(it.tableName, it.pageId+1)
-	return err != nil
+	if it.Page.Tuples[it.pageIteratorCursor.tupleOffset] == nil {
+		return nil, false
+	}
+	return it.Page.Tuples[it.pageIteratorCursor.tupleOffset], true
 }
 
 func (st *Storage) ReadPage(tableName string, pageId PageId) (*Page, error) {
@@ -66,17 +109,18 @@ func (st *Storage) WriteIndex(btree *BTree) error {
 	return st.diskManager.WriteIndex(btree)
 }
 
-func (st *Storage) InsertTuple(tableName string, tuple *Tuple) (*Page, error) {
-	it := st.NewPageIterator(tableName)
+func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Transaction) (*Page, error) {
+	it := st.NewTupleIterator(tableName, transaction)
 
-	for it.Next() {
-		if it.IsEnd() {
+	for true {
+		_, found := it.Next()
+		if !found {
 			break
 		}
 	}
 
 	if it.Page.Tuples.IsFull() {
-		newPage := NewPage(tableName, PageId(it.pageId+1), [TupleNumPerPage]*Tuple{tuple})
+		newPage := NewPage(tableName, it.pageIteratorCursor.pageId+1, [TupleNumPerPage]*Tuple{tuple})
 		return nil, st.diskManager.WritePage(newPage)
 	}
 
