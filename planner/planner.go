@@ -9,5 +9,4 @@ type Planner interface {
 }
 
 type Plan interface {
-	Child() Plan
 }
