@@ -18,25 +18,25 @@ func NewStorage(diskManager *DiskManager) *Storage {
 type TupleIterator struct {
 	diskManager        *DiskManager
 	tableName          string
-	pageIteratorCursor *PageIteratorCursor
+	pageIteratorCursor *TupleIteratorCursor
 
 	Page        *Page
 	transaction *Transaction
 }
 
-type PageIteratorCursor struct {
+type TupleIteratorCursor struct {
 	pageId      PageId
 	tupleOffset uint8
 }
 
-func NewPageIteratorCursor(pageId PageId) *PageIteratorCursor {
-	return &PageIteratorCursor{
+func NewTupleIteratorCursor(pageId PageId) *TupleIteratorCursor {
+	return &TupleIteratorCursor{
 		pageId:      pageId,
 		tupleOffset: 0,
 	}
 }
 
-func (it *PageIteratorCursor) Next() bool {
+func (it *TupleIteratorCursor) Next() bool {
 	it.tupleOffset++
 	if it.tupleOffset >= TupleNumPerPage {
 		it.pageId++
@@ -50,7 +50,7 @@ func (st *Storage) NewTupleIterator(tableName string, transaction *Transaction) 
 	return &TupleIterator{
 		diskManager:        st.diskManager,
 		tableName:          tableName,
-		pageIteratorCursor: NewPageIteratorCursor(1),
+		pageIteratorCursor: NewTupleIteratorCursor(1),
 
 		Page:        nil,
 		transaction: transaction,
@@ -121,10 +121,25 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Tran
 
 	if it.Page.Tuples.IsFull() {
 		newPage := NewPage(tableName, it.pageIteratorCursor.pageId+1, [TupleNumPerPage]*Tuple{tuple})
+		transaction.AddWriteRecord(
+			nil,
+			&TupleId{
+				pageId: newPage.Id,
+				slotId: 0,
+			},
+		)
 		return nil, st.diskManager.WritePage(newPage)
 	}
 
 	it.Page.Tuples.Insert(tuple)
+	transaction.AddWriteRecord(
+		nil,
+		&TupleId{
+			pageId: it.pageIteratorCursor.pageId,
+			slotId: it.pageIteratorCursor.tupleOffset + 1,
+		},
+	)
+
 	return it.Page, st.diskManager.WritePage(it.Page)
 }
 

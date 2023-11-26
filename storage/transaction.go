@@ -46,3 +46,10 @@ func (t *Transaction) GetState() TransactionState {
 func (t *Transaction) GetId() TransactionId {
 	return t.id
 }
+
+func (t *Transaction) AddWriteRecord(oldTupleId *TupleId, newTupleId *TupleId) {
+	t.writeRecords = append(t.writeRecords, &WriteRecord{
+		oldTupleId: oldTupleId,
+		newTupleId: newTupleId,
+	})
+}
