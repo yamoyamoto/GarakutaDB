@@ -15,7 +15,7 @@ func NewStorage(diskManager *DiskManager) *Storage {
 	}
 }
 
-type PageIterator struct {
+type TupleIterator struct {
 	diskManager        *DiskManager
 	tableName          string
 	pageIteratorCursor *PageIteratorCursor
@@ -46,8 +46,8 @@ func (it *PageIteratorCursor) Next() bool {
 	return false
 }
 
-func (st *Storage) NewTupleIterator(tableName string, transaction *Transaction) *PageIterator {
-	return &PageIterator{
+func (st *Storage) NewTupleIterator(tableName string, transaction *Transaction) *TupleIterator {
+	return &TupleIterator{
 		diskManager:        st.diskManager,
 		tableName:          tableName,
 		pageIteratorCursor: NewPageIteratorCursor(1),
@@ -57,7 +57,7 @@ func (st *Storage) NewTupleIterator(tableName string, transaction *Transaction) 
 	}
 }
 
-func (it *PageIterator) Next() (*Tuple, bool) {
+func (it *TupleIterator) Next() (*Tuple, bool) {
 	if it.Page == nil {
 		p, err := it.diskManager.ReadPage(it.tableName, it.pageIteratorCursor.pageId)
 		if err != nil {
