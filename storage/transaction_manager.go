@@ -13,14 +13,17 @@ type TransactionManager struct {
 	exclusiveLocks map[PageId]TransactionId
 
 	mutex *sync.Mutex
+
+	storage *Storage
 }
 
-func NewTransactionManager() *TransactionManager {
+func NewTransactionManager(storage *Storage) *TransactionManager {
 	return &TransactionManager{
 		transactions:   make(map[TransactionId]*Transaction, 0),
 		sharedLocks:    make(map[PageId][]TransactionId, 0),
 		exclusiveLocks: make(map[PageId]TransactionId, 0),
 		mutex:          new(sync.Mutex),
+		storage:        storage,
 	}
 }
 
@@ -33,12 +36,24 @@ func (tm *TransactionManager) Begin() *Transaction {
 	return tm.transactions[tm.latestTransactionId]
 }
 
-func (tm *TransactionManager) Commit(t *Transaction) {
-	// 古い方を消す
-
+func (tm *TransactionManager) Commit(t *Transaction) error {
+	for _, writeRecord := range t.writeRecords {
+		if writeRecord.oldTupleId != nil {
+			if _, err := tm.storage.DeleteTuple(writeRecord.tableName, writeRecord.oldTupleId, t); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
-func (tm *TransactionManager) Abort(t *Transaction) {
-	// 新しい方を消す
-
+func (tm *TransactionManager) Abort(t *Transaction) error {
+	for _, writeRecord := range t.writeRecords {
+		if writeRecord.newTupleId != nil {
+			if _, err := tm.storage.DeleteTuple(writeRecord.tableName, writeRecord.newTupleId, t); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

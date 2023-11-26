@@ -112,6 +112,7 @@ func (st *Storage) WriteIndex(btree *BTree) error {
 func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Transaction) (*Page, error) {
 	it := st.NewTupleIterator(tableName, transaction)
 
+	// TODO: improve performance (want to avoid full scan)
 	for true {
 		_, found := it.Next()
 		if !found {
@@ -121,26 +122,46 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Tran
 
 	if it.Page.Tuples.IsFull() {
 		newPage := NewPage(tableName, it.pageIteratorCursor.pageId+1, [TupleNumPerPage]*Tuple{tuple})
-		transaction.AddWriteRecord(
-			nil,
-			&TupleId{
-				pageId: newPage.Id,
-				slotId: 0,
-			},
-		)
+		if transaction.state == ACTIVE {
+			transaction.AddWriteRecord(
+				tableName,
+				nil,
+				&TupleId{
+					pageId: newPage.Id,
+					slotId: 0,
+				},
+			)
+		}
 		return nil, st.diskManager.WritePage(newPage)
 	}
 
 	it.Page.Tuples.Insert(tuple)
-	transaction.AddWriteRecord(
-		nil,
-		&TupleId{
-			pageId: it.pageIteratorCursor.pageId,
-			slotId: it.pageIteratorCursor.tupleOffset + 1,
-		},
-	)
+	if transaction.state == ACTIVE {
+		transaction.AddWriteRecord(
+			tableName,
+			nil,
+			&TupleId{
+				pageId: it.pageIteratorCursor.pageId,
+				slotId: it.pageIteratorCursor.tupleOffset + 1,
+			},
+		)
+	}
 
 	return it.Page, st.diskManager.WritePage(it.Page)
+}
+
+func (st *Storage) DeleteTuple(tableName string, tupleId *TupleId, transaction *Transaction) (*Page, error) {
+	page, err := st.diskManager.ReadPage(tableName, tupleId.pageId)
+	if err != nil {
+		return nil, err
+	}
+
+	page.Tuples.DeleteTuple(tupleId.slotId)
+	if transaction.state == ACTIVE {
+		transaction.AddWriteRecord(tableName, tupleId, nil)
+	}
+
+	return page, st.diskManager.WritePage(page)
 }
 
 func (st *Storage) ReadJson(path string, out interface{}) error {

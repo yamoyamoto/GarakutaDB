@@ -11,6 +11,7 @@ type Transaction struct {
 }
 
 type WriteRecord struct {
+	tableName  string
 	oldTupleId *TupleId
 	newTupleId *TupleId
 }
@@ -47,8 +48,9 @@ func (t *Transaction) GetId() TransactionId {
 	return t.id
 }
 
-func (t *Transaction) AddWriteRecord(oldTupleId *TupleId, newTupleId *TupleId) {
+func (t *Transaction) AddWriteRecord(tableName string, oldTupleId *TupleId, newTupleId *TupleId) {
 	t.writeRecords = append(t.writeRecords, &WriteRecord{
+		tableName:  tableName,
 		oldTupleId: oldTupleId,
 		newTupleId: newTupleId,
 	})
