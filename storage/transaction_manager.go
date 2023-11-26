@@ -5,12 +5,8 @@ import (
 )
 
 type TransactionManager struct {
-	transactions map[TransactionId]*Transaction
-
+	transactions        map[TransactionId]*Transaction
 	latestTransactionId TransactionId
-
-	sharedLocks    map[PageId][]TransactionId
-	exclusiveLocks map[PageId]TransactionId
 
 	mutex *sync.Mutex
 
@@ -19,11 +15,9 @@ type TransactionManager struct {
 
 func NewTransactionManager(storage *Storage) *TransactionManager {
 	return &TransactionManager{
-		transactions:   make(map[TransactionId]*Transaction, 0),
-		sharedLocks:    make(map[PageId][]TransactionId, 0),
-		exclusiveLocks: make(map[PageId]TransactionId, 0),
-		mutex:          new(sync.Mutex),
-		storage:        storage,
+		transactions: make(map[TransactionId]*Transaction, 0),
+		mutex:        new(sync.Mutex),
+		storage:      storage,
 	}
 }
 
