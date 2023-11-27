@@ -197,6 +197,24 @@ func (b *BTree) Search(item *StringItem) (*StringItem, bool) {
 	return b.Top.search(item)
 }
 
+func (b *BTree) SearchAndUpdatePageId(item *StringItem) (*StringItem, bool) {
+	b.Mutex.Lock()
+	defer b.Mutex.Unlock()
+
+	if b.Top == nil {
+		return nil, false
+	}
+
+	stringItem, found := b.Top.search(item)
+	if !found {
+		return nil, false
+	}
+
+	stringItem.PageId = item.PageId
+
+	return stringItem, true
+}
+
 // Delete deletes item from btree
 // TODO: improve performance (implement delete method of btree)
 func (b *BTree) Delete(item *StringItem) bool {

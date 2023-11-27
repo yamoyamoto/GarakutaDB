@@ -25,6 +25,8 @@ func (sp *SimpleParser) Parse(SqlString string) (Stmt, error) {
 		return statements.BuildSelectStmt(s)
 	case *sqlparser.Insert:
 		return statements.BuildInsertStmt(s)
+	case *sqlparser.Update:
+		return statements.BuildUpdateStmt(s)
 	case *sqlparser.Delete:
 		return statements.BuildDeleteStmt(s)
 	case *sqlparser.DDL:

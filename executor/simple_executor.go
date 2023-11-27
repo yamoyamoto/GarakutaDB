@@ -7,6 +7,7 @@ import (
 	"garakutadb/expression"
 	"garakutadb/planner"
 	"garakutadb/storage"
+	"slices"
 )
 
 type SimpleExecutor struct {
@@ -39,6 +40,8 @@ func (e *SimpleExecutor) Execute(pl planner.Plan, transaction *storage.Transacti
 		return NewInsertExecutor(e.catalog, e.storage, transaction).Execute(*p)
 	case *planner.DeletePlan:
 		return NewDeleteExecutor(e.catalog, e.storage, transaction).Execute(*p)
+	case *planner.UpdatePlan:
+		return NewUpdateExecutor(e.catalog, e.storage, transaction).Execute(*p)
 	case *planner.CreateTablePlan:
 		return NewCreateTableExecutor(e.catalog, e.storage).Execute(*p)
 	default:
@@ -260,6 +263,8 @@ func (e *InsertExecutor) Execute(pl planner.InsertPlan) (*ResultSet, error) {
 		return nil, err
 	}
 
+	btree.PrintTree()
+
 	if err := e.storage.WriteIndex(btree); err != nil {
 		return nil, err
 	}
@@ -341,5 +346,97 @@ func (e *DeleteExecutor) Execute(pl planner.DeletePlan) (*ResultSet, error) {
 
 	return &ResultSet{
 		Message: "deleted!",
+	}, nil
+}
+
+type UpdateExecutor struct {
+	storage     *storage.Storage
+	catalog     *catalog.Catalog
+	transaction *storage.Transaction
+}
+
+func NewUpdateExecutor(catalog *catalog.Catalog, storage *storage.Storage, transaction *storage.Transaction) *UpdateExecutor {
+	return &UpdateExecutor{
+		storage:     storage,
+		catalog:     catalog,
+		transaction: transaction,
+	}
+}
+
+func (e *UpdateExecutor) Execute(pl planner.UpdatePlan) (*ResultSet, error) {
+	isUpdateAll := pl.WhereExpression == nil
+	if isUpdateAll {
+		return nil, fmt.Errorf("updating all is not supported yet")
+	}
+
+	tableSchema, err := e.catalog.TableSchemas.Get(pl.TableName)
+	if err != nil {
+		return nil, err
+	}
+
+	columnNameAndOrderMap := make(map[string]uint64)
+	for order, col := range tableSchema.Columns {
+		columnNameAndOrderMap[col.Name] = uint64(order)
+	}
+
+	it := e.storage.NewTupleIterator(pl.TableName, e.transaction)
+	updatedTupleIds := make([]string, 0)
+	for true {
+		tuple, found := it.Next()
+		if !found {
+			break
+		}
+
+		if len(tuple.Data) == 0 || slices.Contains(updatedTupleIds, tuple.Data[0].Value) {
+			continue
+		}
+
+		row := make([]string, len(columnNameAndOrderMap))
+		for order, _ := range tableSchema.Columns {
+			row[order] = tuple.Data[order].Value
+		}
+
+		evalResult, err := evalWhere(pl.WhereExpression, row, columnNameAndOrderMap)
+		if err != nil {
+			return nil, err
+		}
+		if evalResult {
+			// update tuple
+			for i, newValue := range pl.ColumnValues {
+				tuple.Data[pl.ColumnOrders[i]].Value = newValue
+			}
+			if err := e.storage.DeleteTuple(pl.TableName, it.GetTupleId(), e.transaction); err != nil {
+				return nil, err
+			}
+			insertedTuplePage, err := e.storage.InsertTuple(pl.TableName, tuple, e.transaction)
+			if err != nil {
+				return nil, err
+			}
+
+			// update index entry
+			btree, err := e.storage.ReadIndex(pl.TableName, tableSchema.PK)
+			if err != nil {
+				return nil, err
+			}
+			item, found := btree.SearchAndUpdatePageId(&storage.StringItem{
+				Value:  tuple.Data[0].Value,
+				PageId: insertedTuplePage.Id,
+			})
+			if !found {
+				return nil, fmt.Errorf("index entry not found")
+			}
+
+			item.Value = tuple.Data[0].Value
+
+			if err := e.storage.WriteIndex(btree); err != nil {
+				return nil, err
+			}
+
+			updatedTupleIds = append(updatedTupleIds, tuple.Data[0].Value)
+		}
+	}
+
+	return &ResultSet{
+		Message: "updated!",
 	}, nil
 }

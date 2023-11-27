@@ -60,6 +60,7 @@ func (st *Storage) NewTupleIterator(tableName string, transaction *Transaction) 
 func (it *TupleIterator) Next() (*Tuple, bool) {
 	tuple, found := it.next()
 	if !found {
+		it.Page = nil
 		return nil, false
 	}
 
@@ -86,7 +87,7 @@ func (it *TupleIterator) next() (*Tuple, bool) {
 
 	isNextPage := it.pageIteratorCursor.Next()
 	if !isNextPage {
-		if it.Page.Tuples[it.pageIteratorCursor.tupleOffset] == nil {
+		if it.Page.Tuples[it.pageIteratorCursor.tupleOffset].Data == nil {
 			return nil, false
 		} else {
 			return it.Page.Tuples[it.pageIteratorCursor.tupleOffset], true
@@ -140,6 +141,20 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Tran
 		}
 	}
 
+	if it.Page == nil {
+		newPage := NewPage(tableName, it.pageIteratorCursor.pageId, [TupleNumPerPage]*Tuple{tuple})
+		if transaction.state == ACTIVE {
+			transaction.AddWriteRecord(
+				tableName,
+				nil,
+				&TupleId{
+					pageId: newPage.Id,
+					slotId: 0,
+				},
+			)
+		}
+		return newPage, st.diskManager.WritePage(newPage)
+	}
 	if it.Page.Tuples.IsFull() {
 		newPage := NewPage(tableName, it.pageIteratorCursor.pageId+1, [TupleNumPerPage]*Tuple{tuple})
 		if transaction.state == ACTIVE {
@@ -152,7 +167,7 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Tran
 				},
 			)
 		}
-		return nil, st.diskManager.WritePage(newPage)
+		return newPage, st.diskManager.WritePage(newPage)
 	}
 
 	it.Page.Tuples.Insert(tuple)
