@@ -316,7 +316,7 @@ func (e *DeleteExecutor) Execute(pl planner.DeletePlan) (*ResultSet, error) {
 		}
 
 		row := make([]string, len(columnNameAndOrderMap))
-		for order, _ := range tableSchema.Columns {
+		for order := range tableSchema.Columns {
 			row[order] = tuple.Data[order].Value
 		}
 
@@ -392,7 +392,7 @@ func (e *UpdateExecutor) Execute(pl planner.UpdatePlan) (*ResultSet, error) {
 		}
 
 		row := make([]string, len(columnNameAndOrderMap))
-		for order, _ := range tableSchema.Columns {
+		for order := range tableSchema.Columns {
 			row[order] = tuple.Data[order].Value
 		}
 
