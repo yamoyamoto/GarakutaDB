@@ -58,6 +58,19 @@ func (st *Storage) NewTupleIterator(tableName string, transaction *Transaction) 
 }
 
 func (it *TupleIterator) Next() (*Tuple, bool) {
+	tuple, found := it.next()
+	if !found {
+		return nil, false
+	}
+
+	if tuple.IsDeleted {
+		return it.Next()
+	}
+
+	return tuple, true
+}
+
+func (it *TupleIterator) next() (*Tuple, bool) {
 	if it.Page == nil {
 		p, err := it.diskManager.ReadPage(it.tableName, it.pageIteratorCursor.pageId)
 		if err != nil {
@@ -91,6 +104,13 @@ func (it *TupleIterator) Next() (*Tuple, bool) {
 		return nil, false
 	}
 	return it.Page.Tuples[it.pageIteratorCursor.tupleOffset], true
+}
+
+func (it *TupleIterator) GetTupleId() *TupleId {
+	return &TupleId{
+		pageId: it.pageIteratorCursor.pageId,
+		slotId: it.pageIteratorCursor.tupleOffset,
+	}
 }
 
 func (st *Storage) ReadPage(tableName string, pageId PageId) (*Page, error) {
@@ -150,10 +170,10 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Tran
 	return it.Page, st.diskManager.WritePage(it.Page)
 }
 
-func (st *Storage) DeleteTuple(tableName string, tupleId *TupleId, transaction *Transaction) (*Page, error) {
+func (st *Storage) DeleteTuple(tableName string, tupleId *TupleId, transaction *Transaction) error {
 	page, err := st.diskManager.ReadPage(tableName, tupleId.pageId)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	page.Tuples.DeleteTuple(tupleId.slotId)
@@ -161,7 +181,7 @@ func (st *Storage) DeleteTuple(tableName string, tupleId *TupleId, transaction *
 		transaction.AddWriteRecord(tableName, tupleId, nil)
 	}
 
-	return page, st.diskManager.WritePage(page)
+	return st.diskManager.WritePage(page)
 }
 
 func (st *Storage) ReadJson(path string, out interface{}) error {

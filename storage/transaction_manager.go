@@ -33,7 +33,7 @@ func (tm *TransactionManager) Begin() *Transaction {
 func (tm *TransactionManager) Commit(t *Transaction) error {
 	for _, writeRecord := range t.writeRecords {
 		if writeRecord.oldTupleId != nil {
-			if _, err := tm.storage.DeleteTuple(writeRecord.tableName, writeRecord.oldTupleId, t); err != nil {
+			if err := tm.storage.DeleteTuple(writeRecord.tableName, writeRecord.oldTupleId, t); err != nil {
 				return err
 			}
 		}
@@ -44,7 +44,7 @@ func (tm *TransactionManager) Commit(t *Transaction) error {
 func (tm *TransactionManager) Abort(t *Transaction) error {
 	for _, writeRecord := range t.writeRecords {
 		if writeRecord.newTupleId != nil {
-			if _, err := tm.storage.DeleteTuple(writeRecord.tableName, writeRecord.newTupleId, t); err != nil {
+			if err := tm.storage.DeleteTuple(writeRecord.tableName, writeRecord.newTupleId, t); err != nil {
 				return err
 			}
 		}

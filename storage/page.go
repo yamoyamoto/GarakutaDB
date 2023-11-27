@@ -38,7 +38,7 @@ func (t *Tuples) IsFull() bool {
 }
 
 func (t *Tuples) DeleteTuple(slot uint8) {
-	t[slot].IsDeleted = false
+	t[slot].IsDeleted = true
 }
 
 func NewPage(tableName string, id PageId, tuples [TupleNumPerPage]*Tuple) *Page {

@@ -197,6 +197,50 @@ func (b *BTree) Search(item *StringItem) (*StringItem, bool) {
 	return b.Top.search(item)
 }
 
+// Delete deletes item from btree
+// TODO: improve performance (implement delete method of btree)
+func (b *BTree) Delete(item *StringItem) bool {
+	b.Mutex.Lock()
+	defer b.Mutex.Unlock()
+
+	newBtree := NewBTree(b.TableName, b.IndexName)
+
+	items := b.scan()
+	isDeleted := false
+	for _, itm := range items {
+		if itm.Value == item.Value {
+			isDeleted = true
+		} else {
+			newBtree.Insert(&itm)
+		}
+	}
+
+	b.Top = newBtree.Top
+
+	return isDeleted
+}
+
+// Scan returns all items in btree
+// WARNING: this method is not thread safe!
+func (b *BTree) scan() []StringItem {
+	if b.Top == nil {
+		return nil
+	}
+
+	return b.Top.scan()
+}
+
+func (n *Node) scan() []StringItem {
+	items := make([]StringItem, 0)
+
+	for _, child := range n.Children {
+		items = append(items, child.scan()...)
+	}
+	items = append(items, n.Items...)
+
+	return items
+}
+
 func (n *Node) printNode(indent int) {
 	// 各ノードのアイテムをインデントして表示
 	indentStr := strings.Repeat(" ", indent)

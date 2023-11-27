@@ -17,10 +17,6 @@ type SelectStmt struct {
 	Where *Where
 }
 
-type Where struct {
-	Expression expression.Expression
-}
-
 func BuildSelectStmt(statement *sqlparser.Select) (*SelectStmt, error) {
 	if len(statement.From) != 1 {
 		return nil, fmt.Errorf("only support one table. got: %d", len(statement.From))
