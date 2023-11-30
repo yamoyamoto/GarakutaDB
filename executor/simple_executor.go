@@ -30,18 +30,18 @@ type ResultSet struct {
 	Message string
 }
 
-func (e *SimpleExecutor) Execute(pl planner.Plan, transaction *storage.Transaction) (*ResultSet, error) {
+func (e *SimpleExecutor) Execute(pl planner.Plan, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) (*ResultSet, error) {
 	switch p := pl.(type) {
 	case *planner.SeqScanPlan:
-		return NewSeqScanExecutor(e.storage, transaction).Execute(*p)
+		return NewSeqScanExecutor(e.storage, transaction, transactionMgr).Execute(*p)
 	case *planner.IndexScanPlan:
 		return NewIndexScanExecutor(e.storage, transaction).Execute(*p)
 	case *planner.InsertPlan:
-		return NewInsertExecutor(e.catalog, e.storage, transaction).Execute(*p)
+		return NewInsertExecutor(e.catalog, e.storage, transaction, transactionMgr).Execute(*p)
 	case *planner.DeletePlan:
-		return NewDeleteExecutor(e.catalog, e.storage, transaction).Execute(*p)
+		return NewDeleteExecutor(e.catalog, e.storage, transaction, transactionMgr).Execute(*p)
 	case *planner.UpdatePlan:
-		return NewUpdateExecutor(e.catalog, e.storage, transaction).Execute(*p)
+		return NewUpdateExecutor(e.catalog, e.storage, transaction, transactionMgr).Execute(*p)
 	case *planner.CreateTablePlan:
 		return NewCreateTableExecutor(e.catalog, e.storage).Execute(*p)
 	default:
@@ -50,14 +50,16 @@ func (e *SimpleExecutor) Execute(pl planner.Plan, transaction *storage.Transacti
 }
 
 type SeqScanExecutor struct {
-	storage     *storage.Storage
-	transaction *storage.Transaction
+	storage        *storage.Storage
+	transaction    *storage.Transaction
+	transactionMgr *storage.TransactionManager
 }
 
-func NewSeqScanExecutor(storage *storage.Storage, transaction *storage.Transaction) *SeqScanExecutor {
+func NewSeqScanExecutor(storage *storage.Storage, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) *SeqScanExecutor {
 	return &SeqScanExecutor{
-		storage:     storage,
-		transaction: transaction,
+		storage:        storage,
+		transaction:    transaction,
+		transactionMgr: transactionMgr,
 	}
 }
 
@@ -71,7 +73,7 @@ func (e *SeqScanExecutor) Execute(pl planner.SeqScanPlan) (*ResultSet, error) {
 
 	filteredRows := make([][]string, 0)
 	for true {
-		tuple, found := it.Next()
+		tuple, found := it.Next(e.transactionMgr)
 		if !found {
 			break
 		}
@@ -204,16 +206,18 @@ func (e *CreateTableExecutor) Execute(pl planner.CreateTablePlan) (*ResultSet, e
 }
 
 type InsertExecutor struct {
-	storage     *storage.Storage
-	catalog     *catalog.Catalog
-	transaction *storage.Transaction
+	storage        *storage.Storage
+	catalog        *catalog.Catalog
+	transaction    *storage.Transaction
+	transactionMgr *storage.TransactionManager
 }
 
-func NewInsertExecutor(catalog *catalog.Catalog, storage *storage.Storage, transaction *storage.Transaction) *InsertExecutor {
+func NewInsertExecutor(catalog *catalog.Catalog, storage *storage.Storage, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) *InsertExecutor {
 	return &InsertExecutor{
-		storage:     storage,
-		catalog:     catalog,
-		transaction: transaction,
+		storage:        storage,
+		catalog:        catalog,
+		transaction:    transaction,
+		transactionMgr: transactionMgr,
 	}
 }
 
@@ -251,7 +255,7 @@ func (e *InsertExecutor) Execute(pl planner.InsertPlan) (*ResultSet, error) {
 
 	page, err := e.storage.InsertTuple(pl.Into, &storage.Tuple{
 		Data: tupleValues,
-	}, e.transaction)
+	}, e.transaction, e.transactionMgr)
 	if err != nil {
 		return nil, err
 	}
@@ -275,16 +279,18 @@ func (e *InsertExecutor) Execute(pl planner.InsertPlan) (*ResultSet, error) {
 }
 
 type DeleteExecutor struct {
-	storage     *storage.Storage
-	catalog     *catalog.Catalog
-	transaction *storage.Transaction
+	storage        *storage.Storage
+	catalog        *catalog.Catalog
+	transaction    *storage.Transaction
+	transactionMgr *storage.TransactionManager
 }
 
-func NewDeleteExecutor(catalog *catalog.Catalog, storage *storage.Storage, transaction *storage.Transaction) *DeleteExecutor {
+func NewDeleteExecutor(catalog *catalog.Catalog, storage *storage.Storage, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) *DeleteExecutor {
 	return &DeleteExecutor{
-		storage:     storage,
-		catalog:     catalog,
-		transaction: transaction,
+		storage:        storage,
+		catalog:        catalog,
+		transaction:    transaction,
+		transactionMgr: transactionMgr,
 	}
 }
 
@@ -306,7 +312,7 @@ func (e *DeleteExecutor) Execute(pl planner.DeletePlan) (*ResultSet, error) {
 
 	it := e.storage.NewTupleIterator(pl.TableName, e.transaction)
 	for true {
-		tuple, found := it.Next()
+		tuple, found := it.Next(e.transactionMgr)
 		if !found {
 			break
 		}
@@ -326,7 +332,7 @@ func (e *DeleteExecutor) Execute(pl planner.DeletePlan) (*ResultSet, error) {
 		}
 		if evalResult {
 			// delete tuple
-			if err := e.storage.DeleteTuple(pl.TableName, it.GetTupleId(), e.transaction); err != nil {
+			if err := e.storage.DeleteTuple(pl.TableName, it.GetTupleId(), e.transaction, e.transactionMgr); err != nil {
 				return nil, err
 			}
 
@@ -350,16 +356,18 @@ func (e *DeleteExecutor) Execute(pl planner.DeletePlan) (*ResultSet, error) {
 }
 
 type UpdateExecutor struct {
-	storage     *storage.Storage
-	catalog     *catalog.Catalog
-	transaction *storage.Transaction
+	storage        *storage.Storage
+	catalog        *catalog.Catalog
+	transaction    *storage.Transaction
+	transactionMgr *storage.TransactionManager
 }
 
-func NewUpdateExecutor(catalog *catalog.Catalog, storage *storage.Storage, transaction *storage.Transaction) *UpdateExecutor {
+func NewUpdateExecutor(catalog *catalog.Catalog, storage *storage.Storage, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) *UpdateExecutor {
 	return &UpdateExecutor{
-		storage:     storage,
-		catalog:     catalog,
-		transaction: transaction,
+		storage:        storage,
+		catalog:        catalog,
+		transaction:    transaction,
+		transactionMgr: transactionMgr,
 	}
 }
 
@@ -382,7 +390,7 @@ func (e *UpdateExecutor) Execute(pl planner.UpdatePlan) (*ResultSet, error) {
 	it := e.storage.NewTupleIterator(pl.TableName, e.transaction)
 	updatedTupleIds := make([]string, 0)
 	for true {
-		tuple, found := it.Next()
+		tuple, found := it.Next(e.transactionMgr)
 		if !found {
 			break
 		}
@@ -405,10 +413,10 @@ func (e *UpdateExecutor) Execute(pl planner.UpdatePlan) (*ResultSet, error) {
 			for i, newValue := range pl.ColumnValues {
 				tuple.Data[pl.ColumnOrders[i]].Value = newValue
 			}
-			if err := e.storage.DeleteTuple(pl.TableName, it.GetTupleId(), e.transaction); err != nil {
+			if err := e.storage.DeleteTuple(pl.TableName, it.GetTupleId(), e.transaction, e.transactionMgr); err != nil {
 				return nil, err
 			}
-			insertedTuplePage, err := e.storage.InsertTuple(pl.TableName, tuple, e.transaction)
+			insertedTuplePage, err := e.storage.InsertTuple(pl.TableName, tuple, e.transaction, e.transactionMgr)
 			if err != nil {
 				return nil, err
 			}

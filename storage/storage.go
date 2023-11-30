@@ -2,6 +2,9 @@ package storage
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"log"
 	"os"
 )
 
@@ -46,6 +49,19 @@ func (it *TupleIteratorCursor) Next() bool {
 	return false
 }
 
+func (it *TupleIterator) canSee(transactionMgr *TransactionManager) bool {
+	return transactionMgr.IsLockShared(it.transaction, &TupleId{
+		pageId: it.pageIteratorCursor.pageId,
+		slotId: it.pageIteratorCursor.tupleOffset,
+	}) || transactionMgr.IsLockExclusive(it.transaction, &TupleId{
+		pageId: it.pageIteratorCursor.pageId,
+		slotId: it.pageIteratorCursor.tupleOffset,
+	}) || transactionMgr.LockShared(it.transaction, &TupleId{
+		pageId: it.pageIteratorCursor.pageId,
+		slotId: it.pageIteratorCursor.tupleOffset,
+	})
+}
+
 func (st *Storage) NewTupleIterator(tableName string, transaction *Transaction) *TupleIterator {
 	return &TupleIterator{
 		diskManager:        st.diskManager,
@@ -57,21 +73,20 @@ func (st *Storage) NewTupleIterator(tableName string, transaction *Transaction) 
 	}
 }
 
-func (it *TupleIterator) Next() (*Tuple, bool) {
-	tuple, found := it.next()
+func (it *TupleIterator) Next(transactionMgr *TransactionManager) (*Tuple, bool) {
+	tuple, found := it.next(transactionMgr)
 	if !found {
-		it.Page = nil
 		return nil, false
 	}
 
 	if tuple.IsDeleted {
-		return it.Next()
+		return it.Next(transactionMgr)
 	}
 
 	return tuple, true
 }
 
-func (it *TupleIterator) next() (*Tuple, bool) {
+func (it *TupleIterator) next(transactionMgr *TransactionManager) (*Tuple, bool) {
 	if it.Page == nil {
 		p, err := it.diskManager.ReadPage(it.tableName, it.pageIteratorCursor.pageId)
 		if err != nil {
@@ -89,8 +104,10 @@ func (it *TupleIterator) next() (*Tuple, bool) {
 	if !isNextPage {
 		if it.Page.Tuples[it.pageIteratorCursor.tupleOffset].Data == nil {
 			return nil, false
-		} else {
+		} else if it.canSee(transactionMgr) {
 			return it.Page.Tuples[it.pageIteratorCursor.tupleOffset], true
+		} else {
+			return it.next(transactionMgr)
 		}
 	}
 
@@ -103,6 +120,12 @@ func (it *TupleIterator) next() (*Tuple, bool) {
 
 	if it.Page.Tuples[it.pageIteratorCursor.tupleOffset] == nil {
 		return nil, false
+	}
+
+	log.Printf("tuple: %#v", it.Page.Tuples[it.pageIteratorCursor.tupleOffset])
+	if !it.canSee(transactionMgr) {
+		log.Printf("can't see tuple: %#v", it.Page.Tuples[it.pageIteratorCursor.tupleOffset])
+		return it.next(transactionMgr)
 	}
 	return it.Page.Tuples[it.pageIteratorCursor.tupleOffset], true
 }
@@ -130,44 +153,68 @@ func (st *Storage) WriteIndex(btree *BTree) error {
 	return st.diskManager.WriteIndex(btree)
 }
 
-func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Transaction) (*Page, error) {
+func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Transaction, transactionMgr *TransactionManager) (*Page, error) {
 	it := st.NewTupleIterator(tableName, transaction)
 
 	// TODO: improve performance (want to avoid full scan)
 	for true {
-		_, found := it.Next()
+		_, found := it.Next(transactionMgr)
+		log.Printf("found: %v tuple Id: %#v", found, it.GetTupleId())
 		if !found {
 			break
 		}
+		transactionMgr.UnlockShared(transaction, it.GetTupleId())
 	}
 
 	if it.Page == nil {
 		newPage := NewPage(tableName, it.pageIteratorCursor.pageId, [TupleNumPerPage]*Tuple{tuple})
+		newTupleId := &TupleId{
+			pageId: newPage.Id,
+			slotId: 0,
+		}
+		success := transactionMgr.LockExclusive(transaction, newTupleId)
+		if !success {
+			return nil, fmt.Errorf("failed to lock exclusive")
+		}
+
 		if transaction.state == ACTIVE {
 			transaction.AddWriteRecord(
 				tableName,
 				nil,
-				&TupleId{
-					pageId: newPage.Id,
-					slotId: 0,
-				},
+				newTupleId,
 			)
 		}
 		return newPage, st.diskManager.WritePage(newPage)
 	}
+
 	if it.Page.Tuples.IsFull() {
 		newPage := NewPage(tableName, it.pageIteratorCursor.pageId+1, [TupleNumPerPage]*Tuple{tuple})
+		newTupleId := &TupleId{
+			pageId: newPage.Id,
+			slotId: 0,
+		}
+		success := transactionMgr.LockExclusive(transaction, newTupleId)
+		if !success {
+			return nil, fmt.Errorf("failed to lock exclusive")
+		}
+
 		if transaction.state == ACTIVE {
 			transaction.AddWriteRecord(
 				tableName,
 				nil,
-				&TupleId{
-					pageId: newPage.Id,
-					slotId: 0,
-				},
+				newTupleId,
 			)
 		}
 		return newPage, st.diskManager.WritePage(newPage)
+	}
+
+	tupleId := &TupleId{
+		pageId: it.pageIteratorCursor.pageId,
+		slotId: it.pageIteratorCursor.tupleOffset + 1,
+	}
+	success := transactionMgr.LockExclusive(transaction, tupleId)
+	if !success {
+		return nil, fmt.Errorf("failed to lock exclusive")
 	}
 
 	it.Page.Tuples.Insert(tuple)
@@ -175,20 +222,22 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Tran
 		transaction.AddWriteRecord(
 			tableName,
 			nil,
-			&TupleId{
-				pageId: it.pageIteratorCursor.pageId,
-				slotId: it.pageIteratorCursor.tupleOffset + 1,
-			},
+			tupleId,
 		)
 	}
 
 	return it.Page, st.diskManager.WritePage(it.Page)
 }
 
-func (st *Storage) DeleteTuple(tableName string, tupleId *TupleId, transaction *Transaction) error {
+func (st *Storage) DeleteTuple(tableName string, tupleId *TupleId, transaction *Transaction, transactionMgr *TransactionManager) error {
 	page, err := st.diskManager.ReadPage(tableName, tupleId.pageId)
 	if err != nil {
 		return err
+	}
+
+	success := transactionMgr.LockExclusive(transaction, tupleId)
+	if !success {
+		return errors.New("failed to lock tuple")
 	}
 
 	page.Tuples.DeleteTuple(tupleId.slotId)
