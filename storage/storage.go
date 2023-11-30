@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 )
 
@@ -122,9 +121,7 @@ func (it *TupleIterator) next(transactionMgr *TransactionManager) (*Tuple, bool)
 		return nil, false
 	}
 
-	log.Printf("tuple: %#v", it.Page.Tuples[it.pageIteratorCursor.tupleOffset])
 	if !it.canSee(transactionMgr) {
-		log.Printf("can't see tuple: %#v", it.Page.Tuples[it.pageIteratorCursor.tupleOffset])
 		return it.next(transactionMgr)
 	}
 	return it.Page.Tuples[it.pageIteratorCursor.tupleOffset], true
@@ -159,11 +156,10 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Tran
 	// TODO: improve performance (want to avoid full scan)
 	for true {
 		_, found := it.Next(transactionMgr)
-		log.Printf("found: %v tuple Id: %#v", found, it.GetTupleId())
 		if !found {
 			break
 		}
-		transactionMgr.UnlockShared(transaction, it.GetTupleId())
+		transactionMgr.UnlockSharedByTupleId(transaction, it.GetTupleId())
 	}
 
 	if it.Page == nil {

@@ -7,6 +7,7 @@ import (
 	"garakutadb/expression"
 	"garakutadb/planner"
 	"garakutadb/storage"
+	"log"
 	"slices"
 )
 
@@ -413,13 +414,16 @@ func (e *UpdateExecutor) Execute(pl planner.UpdatePlan) (*ResultSet, error) {
 			for i, newValue := range pl.ColumnValues {
 				tuple.Data[pl.ColumnOrders[i]].Value = newValue
 			}
+			e.transactionMgr.UnlockSharedByTupleId(e.transaction, it.GetTupleId())
 			if err := e.storage.DeleteTuple(pl.TableName, it.GetTupleId(), e.transaction, e.transactionMgr); err != nil {
 				return nil, err
 			}
+			log.Printf("deleted tuple: %v", tuple)
 			insertedTuplePage, err := e.storage.InsertTuple(pl.TableName, tuple, e.transaction, e.transactionMgr)
 			if err != nil {
 				return nil, err
 			}
+			log.Printf("inserted tuple: %v", tuple)
 
 			// update index entry
 			btree, err := e.storage.ReadIndex(pl.TableName, tableSchema.PK)
@@ -441,6 +445,8 @@ func (e *UpdateExecutor) Execute(pl planner.UpdatePlan) (*ResultSet, error) {
 			}
 
 			updatedTupleIds = append(updatedTupleIds, tuple.Data[0].Value)
+		} else {
+			e.transactionMgr.UnlockSharedByTupleId(e.transaction, it.GetTupleId())
 		}
 	}
 

@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"log"
 	"sync"
 )
 
@@ -44,6 +43,8 @@ func (tm *TransactionManager) Commit(t *Transaction) error {
 			}
 		}
 	}
+	tm.UnlockSharedAll(t)
+	tm.UnlockExclusiveAll(t)
 	return nil
 }
 
@@ -55,6 +56,8 @@ func (tm *TransactionManager) Abort(t *Transaction) error {
 			}
 		}
 	}
+	tm.UnlockSharedAll(t)
+	tm.UnlockExclusiveAll(t)
 	return nil
 }
 
@@ -63,7 +66,6 @@ func (tm *TransactionManager) LockShared(t *Transaction, tupleId *TupleId) bool 
 	defer tm.mutex.Unlock()
 
 	if _, ok := tm.exclusiveLockTable[*tupleId]; ok {
-		log.Printf("shared lock failed. tupleId: %#v", tupleId)
 		return false
 	}
 
@@ -71,8 +73,6 @@ func (tm *TransactionManager) LockShared(t *Transaction, tupleId *TupleId) bool 
 		tm.sharedLockTable[*tupleId] = make([]TransactionId, 0)
 	}
 	tm.sharedLockTable[*tupleId] = append(tm.sharedLockTable[*tupleId], t.id)
-
-	log.Printf("shared lock success. tupleId: %#v", tupleId)
 
 	return true
 }
@@ -82,6 +82,9 @@ func (tm *TransactionManager) LockExclusive(t *Transaction, tupleId *TupleId) bo
 	defer tm.mutex.Unlock()
 
 	if _, ok := tm.exclusiveLockTable[*tupleId]; ok {
+		if tm.exclusiveLockTable[*tupleId] == t.id {
+			return true
+		}
 		return false
 	}
 
@@ -90,8 +93,7 @@ func (tm *TransactionManager) LockExclusive(t *Transaction, tupleId *TupleId) bo
 	}
 
 	tm.exclusiveLockTable[*tupleId] = t.id
-	log.Printf("tupleId: %#v", tupleId)
-	log.Printf("lock table: %#v", tm.exclusiveLockTable)
+
 	return true
 }
 
@@ -122,7 +124,26 @@ func (tm *TransactionManager) IsLockExclusive(t *Transaction, tupleId *TupleId) 
 	return tm.exclusiveLockTable[*tupleId] == t.id
 }
 
-func (tm *TransactionManager) UnlockShared(t *Transaction, tupleId *TupleId) {
+func (tm *TransactionManager) UnlockSharedAll(t *Transaction) {
+	tm.mutex.Lock()
+	defer tm.mutex.Unlock()
+
+	for tupleId, ids := range tm.sharedLockTable {
+		for i, id := range ids {
+			if id == t.id {
+				ids = append(ids[:i], ids[i+1:]...)
+				if len(ids) == 0 {
+					delete(tm.sharedLockTable, tupleId)
+				} else {
+					tm.sharedLockTable[tupleId] = ids
+				}
+				return
+			}
+		}
+	}
+}
+
+func (tm *TransactionManager) UnlockSharedByTupleId(t *Transaction, tupleId *TupleId) {
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
 
@@ -133,18 +154,22 @@ func (tm *TransactionManager) UnlockShared(t *Transaction, tupleId *TupleId) {
 	for i, id := range tm.sharedLockTable[*tupleId] {
 		if id == t.id {
 			tm.sharedLockTable[*tupleId] = append(tm.sharedLockTable[*tupleId][:i], tm.sharedLockTable[*tupleId][i+1:]...)
-			return
+			break
 		}
+	}
+	if len(tm.sharedLockTable[*tupleId]) == 0 {
+		delete(tm.sharedLockTable, *tupleId)
 	}
 }
 
-func (tm *TransactionManager) UnlockExclusive(t *Transaction, tupleId *TupleId) {
+func (tm *TransactionManager) UnlockExclusiveAll(t *Transaction) {
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
 
-	if _, ok := tm.exclusiveLockTable[*tupleId]; !ok {
-		return
+	for tupleId, id := range tm.exclusiveLockTable {
+		if id == t.id {
+			delete(tm.exclusiveLockTable, tupleId)
+			return
+		}
 	}
-
-	delete(tm.exclusiveLockTable, *tupleId)
 }

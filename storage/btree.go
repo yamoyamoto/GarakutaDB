@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 )
@@ -231,7 +230,6 @@ func (b *BTree) Delete(item *StringItem) bool {
 			isDeleted = true
 		} else {
 			if err := newBtree.Insert(&itm); err != nil {
-				log.Printf("failed to insert item to new btree: %v", err)
 				return false
 			}
 		}

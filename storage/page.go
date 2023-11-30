@@ -2,7 +2,6 @@ package storage
 
 import (
 	"google.golang.org/protobuf/proto"
-	"log"
 )
 
 const (
@@ -23,7 +22,6 @@ type Tuples [TupleNumPerPage]*Tuple
 func (t *Tuples) Insert(tuple *Tuple) {
 	for i, v := range t {
 		if v == nil || v.Data == nil {
-			log.Printf("inserting tuple to index %d. %#v", i, tuple)
 			t[i] = tuple
 			return
 		}
