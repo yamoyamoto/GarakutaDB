@@ -29,6 +29,7 @@ func BuildInsertPlan(ct *catalog.Catalog, insertStmt *statements.InsertStmt) (Pl
 	columnValues := make([]string, 0)
 	pkValue := ""
 	if len(insertStmt.ColumnNames) == 0 {
+		pkValue = insertStmt.Values[0]
 		for order, col := range tableSchema.Columns {
 			columnNames = append(columnNames, col.Name)
 			columnOrders = append(columnOrders, uint64(order))

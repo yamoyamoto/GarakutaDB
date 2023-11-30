@@ -11,9 +11,11 @@ const (
 
 type Page struct {
 	TableName string
-	Id        uint64
+	Id        PageId
 	Tuples    Tuples
 }
+
+type PageId uint64
 
 type Tuples [TupleNumPerPage]*Tuple
 
@@ -35,7 +37,11 @@ func (t *Tuples) IsFull() bool {
 	return true
 }
 
-func NewPage(tableName string, id uint64, tuples [TupleNumPerPage]*Tuple) *Page {
+func (t *Tuples) DeleteTuple(slot uint8) {
+	t[slot].IsDeleted = true
+}
+
+func NewPage(tableName string, id PageId, tuples [TupleNumPerPage]*Tuple) *Page {
 	return &Page{
 		TableName: tableName,
 		Id:        id,
@@ -61,7 +67,7 @@ func (p *Page) Serialize() ([PageByteSize]byte, error) {
 	return pageBytes, nil
 }
 
-func DeserializePage(tableName string, pageId uint64, pageBytes [PageByteSize]byte) (*Page, error) {
+func DeserializePage(tableName string, pageId PageId, pageBytes [PageByteSize]byte) (*Page, error) {
 	tuples := [TupleNumPerPage]*Tuple{}
 
 	for i := 0; i < TupleNumPerPage; i++ {

@@ -8,8 +8,6 @@ import (
 	"slices"
 )
 
-type SelectPlan struct{}
-
 func BuildSelectPlan(ct *catalog.Catalog, selectStmt *statements.SelectStmt) (Plan, error) {
 	tableSchema, err := ct.TableSchemas.Get(selectStmt.From)
 	if err == catalog.TableSchemaNotFoundError {

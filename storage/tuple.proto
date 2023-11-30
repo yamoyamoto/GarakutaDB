@@ -8,4 +8,5 @@ message TupleValue{
 
 message Tuple {
   repeated TupleValue data = 2;
+  bool isDeleted = 3;
 }

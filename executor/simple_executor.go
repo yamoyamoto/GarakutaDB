@@ -8,6 +8,7 @@ import (
 	"garakutadb/planner"
 	"garakutadb/storage"
 	"log"
+	"slices"
 )
 
 type SimpleExecutor struct {
@@ -30,14 +31,18 @@ type ResultSet struct {
 	Message string
 }
 
-func (e *SimpleExecutor) Execute(pl planner.Plan) (*ResultSet, error) {
+func (e *SimpleExecutor) Execute(pl planner.Plan, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) (*ResultSet, error) {
 	switch p := pl.(type) {
 	case *planner.SeqScanPlan:
-		return NewSeqScanExecutor(e.storage).Execute(*p)
+		return NewSeqScanExecutor(e.storage, transaction, transactionMgr).Execute(*p)
 	case *planner.IndexScanPlan:
-		return NewIndexScanExecutor(e.storage).Execute(*p)
+		return NewIndexScanExecutor(e.storage, transaction).Execute(*p)
 	case *planner.InsertPlan:
-		return NewInsertExecutor(e.catalog, e.storage).Execute(*p)
+		return NewInsertExecutor(e.catalog, e.storage, transaction, transactionMgr).Execute(*p)
+	case *planner.DeletePlan:
+		return NewDeleteExecutor(e.catalog, e.storage, transaction, transactionMgr).Execute(*p)
+	case *planner.UpdatePlan:
+		return NewUpdateExecutor(e.catalog, e.storage, transaction, transactionMgr).Execute(*p)
 	case *planner.CreateTablePlan:
 		return NewCreateTableExecutor(e.catalog, e.storage).Execute(*p)
 	default:
@@ -46,71 +51,70 @@ func (e *SimpleExecutor) Execute(pl planner.Plan) (*ResultSet, error) {
 }
 
 type SeqScanExecutor struct {
-	storage *storage.Storage
+	storage        *storage.Storage
+	transaction    *storage.Transaction
+	transactionMgr *storage.TransactionManager
 }
 
-func NewSeqScanExecutor(storage *storage.Storage) *SeqScanExecutor {
+func NewSeqScanExecutor(storage *storage.Storage, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) *SeqScanExecutor {
 	return &SeqScanExecutor{
-		storage: storage,
+		storage:        storage,
+		transaction:    transaction,
+		transactionMgr: transactionMgr,
 	}
 }
 
 func (e *SeqScanExecutor) Execute(pl planner.SeqScanPlan) (*ResultSet, error) {
-	it := e.storage.NewPageIterator(pl.TableName)
-
-	pages := make([]*storage.Page, 0)
-	for it.Next() {
-		pages = append(pages, it.Page)
-	}
+	it := e.storage.NewTupleIterator(pl.TableName, e.transaction)
 
 	columnNameAndOrderMap := make(map[string]uint64)
 	for order, columnName := range pl.ColumnNames {
 		columnNameAndOrderMap[columnName] = uint64(order)
 	}
 
-	rows := make([][]string, 0)
-	for _, page := range pages {
-		for _, tuple := range page.Tuples {
-			if len(tuple.Data) == 0 {
-				continue
-			}
-			row := make([]string, 0)
-			for _, columnOrder := range pl.ColumnOrders {
-				row = append(row, tuple.Data[columnOrder].Value)
-			}
-			rows = append(rows, row)
+	filteredRows := make([][]string, 0)
+	for true {
+		tuple, found := it.Next(e.transactionMgr)
+		if !found {
+			break
 		}
-	}
 
-	if pl.WhereExpression != nil {
-		filteredRows := make([][]string, 0)
-		for _, row := range rows {
-			evalResult, err := evalWhere(pl.WhereExpression, row, &pl, columnNameAndOrderMap)
+		if len(tuple.Data) == 0 {
+			continue
+		}
+
+		row := make([]string, 0)
+		for _, columnOrder := range pl.ColumnOrders {
+			row = append(row, tuple.Data[columnOrder].Value)
+		}
+
+		if pl.WhereExpression != nil {
+			evalResult, err := evalWhere(pl.WhereExpression, row, columnNameAndOrderMap)
 			if err != nil {
 				return nil, err
 			}
-			log.Println("evalResult", evalResult)
 			if evalResult {
 				filteredRows = append(filteredRows, row)
 			}
+		} else {
+			filteredRows = append(filteredRows, row)
 		}
-		rows = filteredRows
 	}
 
 	return &ResultSet{
 		Header: pl.ColumnNames,
-		Rows:   rows,
+		Rows:   filteredRows,
 	}, nil
 }
 
-func evalWhere(expr expression.Expression, row []string, pl *planner.SeqScanPlan, columnNameNadOrderMap map[string]uint64) (bool, error) {
+func evalWhere(expr expression.Expression, row []string, columnNameNadOrderMap map[string]uint64) (bool, error) {
 	switch e := expr.(type) {
 	case *expression.AndExpression:
-		leftResult, err := evalWhere(e.Left, row, pl, columnNameNadOrderMap)
+		leftResult, err := evalWhere(e.Left, row, columnNameNadOrderMap)
 		if err != nil {
 			return false, err
 		}
-		rightResult, err := evalWhere(e.Right, row, pl, columnNameNadOrderMap)
+		rightResult, err := evalWhere(e.Right, row, columnNameNadOrderMap)
 		if err != nil {
 			return false, err
 		}
@@ -124,12 +128,14 @@ func evalWhere(expr expression.Expression, row []string, pl *planner.SeqScanPlan
 }
 
 type IndexScanExecutor struct {
-	storage *storage.Storage
+	storage     *storage.Storage
+	transaction *storage.Transaction
 }
 
-func NewIndexScanExecutor(storage *storage.Storage) *IndexScanExecutor {
+func NewIndexScanExecutor(storage *storage.Storage, transaction *storage.Transaction) *IndexScanExecutor {
 	return &IndexScanExecutor{
-		storage: storage,
+		storage:     storage,
+		transaction: transaction,
 	}
 }
 
@@ -159,6 +165,11 @@ func (e *IndexScanExecutor) Execute(pl planner.IndexScanPlan) (*ResultSet, error
 		if len(tuple.Data) == 0 {
 			continue
 		}
+
+		if tuple.Data[0].Value != pl.SearchKey {
+			continue
+		}
+
 		row := make([]string, 0)
 		for _, columnOrder := range pl.ColumnOrders {
 			row = append(row, tuple.Data[columnOrder].Value)
@@ -196,14 +207,18 @@ func (e *CreateTableExecutor) Execute(pl planner.CreateTablePlan) (*ResultSet, e
 }
 
 type InsertExecutor struct {
-	storage *storage.Storage
-	catalog *catalog.Catalog
+	storage        *storage.Storage
+	catalog        *catalog.Catalog
+	transaction    *storage.Transaction
+	transactionMgr *storage.TransactionManager
 }
 
-func NewInsertExecutor(catalog *catalog.Catalog, storage *storage.Storage) *InsertExecutor {
+func NewInsertExecutor(catalog *catalog.Catalog, storage *storage.Storage, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) *InsertExecutor {
 	return &InsertExecutor{
-		storage: storage,
-		catalog: catalog,
+		storage:        storage,
+		catalog:        catalog,
+		transaction:    transaction,
+		transactionMgr: transactionMgr,
 	}
 }
 
@@ -241,7 +256,7 @@ func (e *InsertExecutor) Execute(pl planner.InsertPlan) (*ResultSet, error) {
 
 	page, err := e.storage.InsertTuple(pl.Into, &storage.Tuple{
 		Data: tupleValues,
-	})
+	}, e.transaction, e.transactionMgr)
 	if err != nil {
 		return nil, err
 	}
@@ -253,11 +268,189 @@ func (e *InsertExecutor) Execute(pl planner.InsertPlan) (*ResultSet, error) {
 		return nil, err
 	}
 
+	btree.PrintTree()
+
 	if err := e.storage.WriteIndex(btree); err != nil {
 		return nil, err
 	}
 
 	return &ResultSet{
 		Message: "successfully inserted!",
+	}, nil
+}
+
+type DeleteExecutor struct {
+	storage        *storage.Storage
+	catalog        *catalog.Catalog
+	transaction    *storage.Transaction
+	transactionMgr *storage.TransactionManager
+}
+
+func NewDeleteExecutor(catalog *catalog.Catalog, storage *storage.Storage, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) *DeleteExecutor {
+	return &DeleteExecutor{
+		storage:        storage,
+		catalog:        catalog,
+		transaction:    transaction,
+		transactionMgr: transactionMgr,
+	}
+}
+
+func (e *DeleteExecutor) Execute(pl planner.DeletePlan) (*ResultSet, error) {
+	isDeleteAll := pl.WhereExpression == nil
+	if isDeleteAll {
+		return nil, fmt.Errorf("deleting all is not supported yet")
+	}
+
+	tableSchema, err := e.catalog.TableSchemas.Get(pl.TableName)
+	if err != nil {
+		return nil, err
+	}
+
+	columnNameAndOrderMap := make(map[string]uint64)
+	for order, col := range tableSchema.Columns {
+		columnNameAndOrderMap[col.Name] = uint64(order)
+	}
+
+	it := e.storage.NewTupleIterator(pl.TableName, e.transaction)
+	for true {
+		tuple, found := it.Next(e.transactionMgr)
+		if !found {
+			break
+		}
+
+		if len(tuple.Data) == 0 {
+			continue
+		}
+
+		row := make([]string, len(columnNameAndOrderMap))
+		for order := range tableSchema.Columns {
+			row[order] = tuple.Data[order].Value
+		}
+
+		evalResult, err := evalWhere(pl.WhereExpression, row, columnNameAndOrderMap)
+		if err != nil {
+			return nil, err
+		}
+		if evalResult {
+			// delete tuple
+			if err := e.storage.DeleteTuple(pl.TableName, it.GetTupleId(), e.transaction, e.transactionMgr); err != nil {
+				return nil, err
+			}
+
+			// delete index entry
+			btree, err := e.storage.ReadIndex(pl.TableName, tableSchema.PK)
+			if err != nil {
+				return nil, err
+			}
+			btree.Delete(&storage.StringItem{
+				Value: tuple.Data[0].Value,
+			})
+			if err := e.storage.WriteIndex(btree); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return &ResultSet{
+		Message: "deleted!",
+	}, nil
+}
+
+type UpdateExecutor struct {
+	storage        *storage.Storage
+	catalog        *catalog.Catalog
+	transaction    *storage.Transaction
+	transactionMgr *storage.TransactionManager
+}
+
+func NewUpdateExecutor(catalog *catalog.Catalog, storage *storage.Storage, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) *UpdateExecutor {
+	return &UpdateExecutor{
+		storage:        storage,
+		catalog:        catalog,
+		transaction:    transaction,
+		transactionMgr: transactionMgr,
+	}
+}
+
+func (e *UpdateExecutor) Execute(pl planner.UpdatePlan) (*ResultSet, error) {
+	isUpdateAll := pl.WhereExpression == nil
+	if isUpdateAll {
+		return nil, fmt.Errorf("updating all is not supported yet")
+	}
+
+	tableSchema, err := e.catalog.TableSchemas.Get(pl.TableName)
+	if err != nil {
+		return nil, err
+	}
+
+	columnNameAndOrderMap := make(map[string]uint64)
+	for order, col := range tableSchema.Columns {
+		columnNameAndOrderMap[col.Name] = uint64(order)
+	}
+
+	it := e.storage.NewTupleIterator(pl.TableName, e.transaction)
+	updatedTupleIds := make([]string, 0)
+	for true {
+		tuple, found := it.Next(e.transactionMgr)
+		if !found {
+			break
+		}
+
+		if len(tuple.Data) == 0 || slices.Contains(updatedTupleIds, tuple.Data[0].Value) {
+			continue
+		}
+
+		row := make([]string, len(columnNameAndOrderMap))
+		for order := range tableSchema.Columns {
+			row[order] = tuple.Data[order].Value
+		}
+
+		evalResult, err := evalWhere(pl.WhereExpression, row, columnNameAndOrderMap)
+		if err != nil {
+			return nil, err
+		}
+		if evalResult {
+			// update tuple
+			for i, newValue := range pl.ColumnValues {
+				tuple.Data[pl.ColumnOrders[i]].Value = newValue
+			}
+			e.transactionMgr.UnlockSharedByTupleId(e.transaction, it.GetTupleId())
+			if err := e.storage.DeleteTuple(pl.TableName, it.GetTupleId(), e.transaction, e.transactionMgr); err != nil {
+				return nil, err
+			}
+			log.Printf("deleted tuple: %v", tuple)
+			insertedTuplePage, err := e.storage.InsertTuple(pl.TableName, tuple, e.transaction, e.transactionMgr)
+			if err != nil {
+				return nil, err
+			}
+			log.Printf("inserted tuple: %v", tuple)
+
+			// update index entry
+			btree, err := e.storage.ReadIndex(pl.TableName, tableSchema.PK)
+			if err != nil {
+				return nil, err
+			}
+			item, found := btree.SearchAndUpdatePageId(&storage.StringItem{
+				Value:  tuple.Data[0].Value,
+				PageId: insertedTuplePage.Id,
+			})
+			if !found {
+				return nil, fmt.Errorf("index entry not found")
+			}
+
+			item.Value = tuple.Data[0].Value
+
+			if err := e.storage.WriteIndex(btree); err != nil {
+				return nil, err
+			}
+
+			updatedTupleIds = append(updatedTupleIds, tuple.Data[0].Value)
+		} else {
+			e.transactionMgr.UnlockSharedByTupleId(e.transaction, it.GetTupleId())
+		}
+	}
+
+	return &ResultSet{
+		Message: "updated!",
 	}, nil
 }

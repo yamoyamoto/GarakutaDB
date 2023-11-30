@@ -1,6 +1,8 @@
 package planner
 
-import "garakutadb/parser"
+import (
+	"garakutadb/parser"
+)
 
 type Planner interface {
 	MakePlan(stmt parser.Stmt) (Plan, error)

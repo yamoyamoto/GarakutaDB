@@ -26,6 +26,10 @@ func (p *SimplePlanner) MakePlan(stmt parser.Stmt) (Plan, error) {
 		return BuildInsertPlan(p.catalog, s)
 	case *ddl.CreateTableStmt:
 		return BuildCreateTablePlan(p.catalog, s)
+	case *statements.DeleteStmt:
+		return BuildDeletePlan(p.catalog, s)
+	case *statements.UpdateStmt:
+		return BuildUpdatePlan(p.catalog, s)
 	default:
 		return nil, fmt.Errorf("not supported statement type: %T", s)
 	}
