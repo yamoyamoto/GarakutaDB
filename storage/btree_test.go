@@ -30,7 +30,7 @@ func TestInsert(t *testing.T) {
 		if !ok {
 			assert.Error(t, fmt.Errorf("failed to find item %#v", item))
 		}
-		assert.Equal(t, item, foundItem)
+		assert.Equal(t, item, *foundItem)
 	}
 }
 
@@ -115,7 +115,7 @@ func TestSearch(t *testing.T) {
 		if !ok {
 			assert.Error(t, fmt.Errorf("failed to find item %#v", item))
 		}
-		assert.Equal(t, item, foundItem)
+		assert.Equal(t, item, *foundItem)
 	}
 }
 
