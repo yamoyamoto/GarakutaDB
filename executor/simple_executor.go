@@ -31,18 +31,18 @@ type ResultSet struct {
 	Message string
 }
 
-func (e *SimpleExecutor) Execute(pl planner.Plan, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) (*ResultSet, error) {
+func (e *SimpleExecutor) Execute(pl planner.Plan, tx *storage.Transaction, txMgr *storage.TransactionManager) (*ResultSet, error) {
 	switch p := pl.(type) {
 	case *planner.SeqScanPlan:
-		return NewSeqScanExecutor(e.storage, transaction, transactionMgr).Execute(*p)
+		return NewSeqScanExecutor(e.storage, tx, txMgr).Execute(*p)
 	case *planner.IndexScanPlan:
-		return NewIndexScanExecutor(e.storage, transaction).Execute(*p)
+		return NewIndexScanExecutor(e.storage, tx).Execute(*p)
 	case *planner.InsertPlan:
-		return NewInsertExecutor(e.catalog, e.storage, transaction, transactionMgr).Execute(*p)
+		return NewInsertExecutor(e.catalog, e.storage, tx, txMgr).Execute(*p)
 	case *planner.DeletePlan:
-		return NewDeleteExecutor(e.catalog, e.storage, transaction, transactionMgr).Execute(*p)
+		return NewDeleteExecutor(e.catalog, e.storage, tx, txMgr).Execute(*p)
 	case *planner.UpdatePlan:
-		return NewUpdateExecutor(e.catalog, e.storage, transaction, transactionMgr).Execute(*p)
+		return NewUpdateExecutor(e.catalog, e.storage, tx, txMgr).Execute(*p)
 	case *planner.CreateTablePlan:
 		return NewCreateTableExecutor(e.catalog, e.storage).Execute(*p)
 	default:
@@ -56,11 +56,11 @@ type SeqScanExecutor struct {
 	transactionMgr *storage.TransactionManager
 }
 
-func NewSeqScanExecutor(storage *storage.Storage, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) *SeqScanExecutor {
+func NewSeqScanExecutor(st *storage.Storage, tx *storage.Transaction, txMgr *storage.TransactionManager) *SeqScanExecutor {
 	return &SeqScanExecutor{
-		storage:        storage,
-		transaction:    transaction,
-		transactionMgr: transactionMgr,
+		storage:        st,
+		transaction:    tx,
+		transactionMgr: txMgr,
 	}
 }
 
@@ -132,10 +132,10 @@ type IndexScanExecutor struct {
 	transaction *storage.Transaction
 }
 
-func NewIndexScanExecutor(storage *storage.Storage, transaction *storage.Transaction) *IndexScanExecutor {
+func NewIndexScanExecutor(st *storage.Storage, tx *storage.Transaction) *IndexScanExecutor {
 	return &IndexScanExecutor{
-		storage:     storage,
-		transaction: transaction,
+		storage:     st,
+		transaction: tx,
 	}
 }
 
@@ -213,12 +213,12 @@ type InsertExecutor struct {
 	transactionMgr *storage.TransactionManager
 }
 
-func NewInsertExecutor(catalog *catalog.Catalog, storage *storage.Storage, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) *InsertExecutor {
+func NewInsertExecutor(ct *catalog.Catalog, st *storage.Storage, tx *storage.Transaction, txMgr *storage.TransactionManager) *InsertExecutor {
 	return &InsertExecutor{
-		storage:        storage,
-		catalog:        catalog,
-		transaction:    transaction,
-		transactionMgr: transactionMgr,
+		storage:        st,
+		catalog:        ct,
+		transaction:    tx,
+		transactionMgr: txMgr,
 	}
 }
 
@@ -286,12 +286,12 @@ type DeleteExecutor struct {
 	transactionMgr *storage.TransactionManager
 }
 
-func NewDeleteExecutor(catalog *catalog.Catalog, storage *storage.Storage, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) *DeleteExecutor {
+func NewDeleteExecutor(ct *catalog.Catalog, st *storage.Storage, tx *storage.Transaction, txMgr *storage.TransactionManager) *DeleteExecutor {
 	return &DeleteExecutor{
-		storage:        storage,
-		catalog:        catalog,
-		transaction:    transaction,
-		transactionMgr: transactionMgr,
+		storage:        st,
+		catalog:        ct,
+		transaction:    tx,
+		transactionMgr: txMgr,
 	}
 }
 
@@ -363,12 +363,12 @@ type UpdateExecutor struct {
 	transactionMgr *storage.TransactionManager
 }
 
-func NewUpdateExecutor(catalog *catalog.Catalog, storage *storage.Storage, transaction *storage.Transaction, transactionMgr *storage.TransactionManager) *UpdateExecutor {
+func NewUpdateExecutor(ct *catalog.Catalog, st *storage.Storage, tx *storage.Transaction, txMgr *storage.TransactionManager) *UpdateExecutor {
 	return &UpdateExecutor{
-		storage:        storage,
-		catalog:        catalog,
-		transaction:    transaction,
-		transactionMgr: transactionMgr,
+		storage:        st,
+		catalog:        ct,
+		transaction:    tx,
+		transactionMgr: txMgr,
 	}
 }
 
