@@ -1,4 +1,4 @@
-name: ci
+name: unit_test
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  ci:
+  unit_test:
     runs-on: ubuntu-latest
 
     steps:
