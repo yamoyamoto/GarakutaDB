@@ -11,9 +11,9 @@ type Storage struct {
 	diskManager *DiskManager
 }
 
-func NewStorage(diskManager *DiskManager) *Storage {
+func NewStorage(dm *DiskManager) *Storage {
 	return &Storage{
-		diskManager: diskManager,
+		diskManager: dm,
 	}
 }
 
@@ -48,44 +48,44 @@ func (it *TupleIteratorCursor) Next() bool {
 	return false
 }
 
-func (it *TupleIterator) canSee(transactionMgr *TransactionManager) bool {
-	return transactionMgr.IsLockShared(it.transaction, &TupleId{
+func (it *TupleIterator) canSee(txMgr *TransactionManager) bool {
+	return txMgr.IsLockShared(it.transaction, &TupleId{
 		pageId: it.pageIteratorCursor.pageId,
 		slotId: it.pageIteratorCursor.tupleOffset,
-	}) || transactionMgr.IsLockExclusive(it.transaction, &TupleId{
+	}) || txMgr.IsLockExclusive(it.transaction, &TupleId{
 		pageId: it.pageIteratorCursor.pageId,
 		slotId: it.pageIteratorCursor.tupleOffset,
-	}) || transactionMgr.LockShared(it.transaction, &TupleId{
+	}) || txMgr.LockShared(it.transaction, &TupleId{
 		pageId: it.pageIteratorCursor.pageId,
 		slotId: it.pageIteratorCursor.tupleOffset,
 	})
 }
 
-func (st *Storage) NewTupleIterator(tableName string, transaction *Transaction) *TupleIterator {
+func (st *Storage) NewTupleIterator(tableName string, tx *Transaction) *TupleIterator {
 	return &TupleIterator{
 		diskManager:        st.diskManager,
 		tableName:          tableName,
 		pageIteratorCursor: NewTupleIteratorCursor(1),
 
 		Page:        nil,
-		transaction: transaction,
+		transaction: tx,
 	}
 }
 
-func (it *TupleIterator) Next(transactionMgr *TransactionManager) (*Tuple, bool) {
-	tuple, found := it.next(transactionMgr)
+func (it *TupleIterator) Next(txMgr *TransactionManager) (*Tuple, bool) {
+	tuple, found := it.next(txMgr)
 	if !found {
 		return nil, false
 	}
 
 	if tuple.IsDeleted {
-		return it.Next(transactionMgr)
+		return it.Next(txMgr)
 	}
 
 	return tuple, true
 }
 
-func (it *TupleIterator) next(transactionMgr *TransactionManager) (*Tuple, bool) {
+func (it *TupleIterator) next(txMgr *TransactionManager) (*Tuple, bool) {
 	if it.Page == nil {
 		p, err := it.diskManager.ReadPage(it.tableName, it.pageIteratorCursor.pageId)
 		if err != nil {
@@ -103,10 +103,10 @@ func (it *TupleIterator) next(transactionMgr *TransactionManager) (*Tuple, bool)
 	if !isNextPage {
 		if it.Page.Tuples[it.pageIteratorCursor.tupleOffset].Data == nil {
 			return nil, false
-		} else if it.canSee(transactionMgr) {
+		} else if it.canSee(txMgr) {
 			return it.Page.Tuples[it.pageIteratorCursor.tupleOffset], true
 		} else {
-			return it.next(transactionMgr)
+			return it.next(txMgr)
 		}
 	}
 
@@ -121,8 +121,8 @@ func (it *TupleIterator) next(transactionMgr *TransactionManager) (*Tuple, bool)
 		return nil, false
 	}
 
-	if !it.canSee(transactionMgr) {
-		return it.next(transactionMgr)
+	if !it.canSee(txMgr) {
+		return it.next(txMgr)
 	}
 	return it.Page.Tuples[it.pageIteratorCursor.tupleOffset], true
 }
@@ -150,16 +150,16 @@ func (st *Storage) WriteIndex(btree *BTree) error {
 	return st.diskManager.WriteIndex(btree)
 }
 
-func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Transaction, transactionMgr *TransactionManager) (*Page, error) {
-	it := st.NewTupleIterator(tableName, transaction)
+func (st *Storage) InsertTuple(tableName string, tuple *Tuple, tx *Transaction, txMgr *TransactionManager) (*Page, error) {
+	it := st.NewTupleIterator(tableName, tx)
 
 	// TODO: improve performance (want to avoid full scan)
 	for true {
-		_, found := it.Next(transactionMgr)
+		_, found := it.Next(txMgr)
 		if !found {
 			break
 		}
-		transactionMgr.UnlockSharedByTupleId(transaction, it.GetTupleId())
+		txMgr.UnlockSharedByTupleId(tx, it.GetTupleId())
 	}
 
 	if it.Page == nil {
@@ -168,13 +168,13 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Tran
 			pageId: newPage.Id,
 			slotId: 0,
 		}
-		success := transactionMgr.LockExclusive(transaction, newTupleId)
+		success := txMgr.LockExclusive(tx, newTupleId)
 		if !success {
 			return nil, fmt.Errorf("failed to lock exclusive")
 		}
 
-		if transaction.state == ACTIVE {
-			transaction.AddWriteRecord(
+		if tx.state == ACTIVE {
+			tx.AddWriteRecord(
 				tableName,
 				nil,
 				newTupleId,
@@ -189,13 +189,13 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Tran
 			pageId: newPage.Id,
 			slotId: 0,
 		}
-		success := transactionMgr.LockExclusive(transaction, newTupleId)
+		success := txMgr.LockExclusive(tx, newTupleId)
 		if !success {
 			return nil, fmt.Errorf("failed to lock exclusive")
 		}
 
-		if transaction.state == ACTIVE {
-			transaction.AddWriteRecord(
+		if tx.state == ACTIVE {
+			tx.AddWriteRecord(
 				tableName,
 				nil,
 				newTupleId,
@@ -208,14 +208,14 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Tran
 		pageId: it.pageIteratorCursor.pageId,
 		slotId: it.pageIteratorCursor.tupleOffset + 1,
 	}
-	success := transactionMgr.LockExclusive(transaction, tupleId)
+	success := txMgr.LockExclusive(tx, tupleId)
 	if !success {
 		return nil, fmt.Errorf("failed to lock exclusive")
 	}
 
 	it.Page.Tuples.Insert(tuple)
-	if transaction.state == ACTIVE {
-		transaction.AddWriteRecord(
+	if tx.state == ACTIVE {
+		tx.AddWriteRecord(
 			tableName,
 			nil,
 			tupleId,
@@ -225,20 +225,20 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple, transaction *Tran
 	return it.Page, st.diskManager.WritePage(it.Page)
 }
 
-func (st *Storage) DeleteTuple(tableName string, tupleId *TupleId, transaction *Transaction, transactionMgr *TransactionManager) error {
+func (st *Storage) DeleteTuple(tableName string, tupleId *TupleId, tx *Transaction, txMgr *TransactionManager) error {
 	page, err := st.diskManager.ReadPage(tableName, tupleId.pageId)
 	if err != nil {
 		return err
 	}
 
-	success := transactionMgr.LockExclusive(transaction, tupleId)
+	success := txMgr.LockExclusive(tx, tupleId)
 	if !success {
 		return errors.New("failed to lock tuple")
 	}
 
 	page.Tuples.DeleteTuple(tupleId.slotId)
-	if transaction.state == ACTIVE {
-		transaction.AddWriteRecord(tableName, tupleId, nil)
+	if tx.state == ACTIVE {
+		tx.AddWriteRecord(tableName, tupleId, nil)
 	}
 
 	return st.diskManager.WritePage(page)

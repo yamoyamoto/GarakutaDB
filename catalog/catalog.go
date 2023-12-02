@@ -10,9 +10,9 @@ type Catalog struct {
 	storage      *storage.Storage
 }
 
-func NewEmptyCatalog(storage *storage.Storage) *Catalog {
+func NewEmptyCatalog(st *storage.Storage) *Catalog {
 	return &Catalog{
-		storage:      storage,
+		storage:      st,
 		TableSchemas: TableSchemas{},
 	}
 }
