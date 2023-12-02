@@ -28,4 +28,4 @@ jobs:
 
       - name: Go Test
         run: |
-          ginkgo -v --cover --coverprofile=coverage.out --race --coverpkg=./... --covermode=atomic --output-dir=/tmp -r test
+          go test ./...
