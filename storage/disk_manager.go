@@ -27,7 +27,7 @@ func (d *DiskManager) makeGeneralFilePath(path string) string {
 	return fmt.Sprintf("%s/%s", d.BasePath, path)
 }
 
-func (d *DiskManager) ReadPage(tableName string, pageId PageId) (*Page, error) {
+func (d *DiskManager) readPage(tableName string, pageId PageId) (*Page, error) {
 	b, err := os.ReadFile(d.makePageFilePath(tableName, pageId))
 	if err != nil {
 		return nil, err
