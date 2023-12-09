@@ -34,7 +34,7 @@ func (e *SimpleExecutor) Execute(pl planner.Plan, tx *storage.Transaction, txMgr
 	case *planner.SeqScanPlan:
 		return NewSeqScanExecutor(e.storage, tx, txMgr).Execute(*p)
 	case *planner.IndexScanPlan:
-		return NewIndexScanExecutor(e.storage, tx).Execute(*p)
+		return NewIndexScanExecutor(e.storage, tx, txMgr).Execute(*p)
 	case *planner.InsertPlan:
 		return NewInsertExecutor(e.catalog, e.storage, tx, txMgr).Execute(*p)
 	case *planner.DeletePlan:

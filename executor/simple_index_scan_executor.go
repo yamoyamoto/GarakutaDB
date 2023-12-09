@@ -11,10 +11,11 @@ type IndexScanExecutor struct {
 	transactionMgr *storage.TransactionManager
 }
 
-func NewIndexScanExecutor(st *storage.Storage, tx *storage.Transaction) *IndexScanExecutor {
+func NewIndexScanExecutor(st *storage.Storage, tx *storage.Transaction, txMgr *storage.TransactionManager) *IndexScanExecutor {
 	return &IndexScanExecutor{
-		storage:     st,
-		transaction: tx,
+		storage:        st,
+		transaction:    tx,
+		transactionMgr: txMgr,
 	}
 }
 
