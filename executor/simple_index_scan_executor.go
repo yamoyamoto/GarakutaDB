@@ -6,14 +6,16 @@ import (
 )
 
 type IndexScanExecutor struct {
-	storage     *storage.Storage
-	transaction *storage.Transaction
+	storage        *storage.Storage
+	transaction    *storage.Transaction
+	transactionMgr *storage.TransactionManager
 }
 
-func NewIndexScanExecutor(st *storage.Storage, tx *storage.Transaction) *IndexScanExecutor {
+func NewIndexScanExecutor(st *storage.Storage, tx *storage.Transaction, txMgr *storage.TransactionManager) *IndexScanExecutor {
 	return &IndexScanExecutor{
-		storage:     st,
-		transaction: tx,
+		storage:        st,
+		transaction:    tx,
+		transactionMgr: txMgr,
 	}
 }
 
@@ -33,31 +35,17 @@ func (e *IndexScanExecutor) Execute(pl planner.IndexScanPlan) (*ResultSet, error
 		}, nil
 	}
 
-	page, err := e.storage.ReadPage(pl.TableName, item.GetPageId())
+	tuple, err := e.storage.GetTupleFromPage(pl.TableName, item.GetPageId(), pl.SearchKey, e.transaction, e.transactionMgr)
 	if err != nil {
 		return nil, err
 	}
-
-	rows := make([][]string, 0)
-	for _, tuple := range page.Tuples {
-		if len(tuple.Data) == 0 {
-			continue
-		}
-
-		if tuple.Data[0].Value != pl.SearchKey {
-			continue
-		}
-
-		row := make([]string, 0)
-		for _, columnOrder := range pl.ColumnOrders {
-			row = append(row, tuple.Data[columnOrder].Value)
-		}
-		rows = append(rows, row)
-		break
+	row := make([]string, 0)
+	for _, columnOrder := range pl.ColumnOrders {
+		row = append(row, tuple.Data[columnOrder].Value)
 	}
 
 	return &ResultSet{
 		Header: pl.ColumnNames,
-		Rows:   rows,
+		Rows:   [][]string{row},
 	}, nil
 }

@@ -87,7 +87,7 @@ func (it *TupleIterator) Next(txMgr *TransactionManager) (*Tuple, bool) {
 
 func (it *TupleIterator) next(txMgr *TransactionManager) (*Tuple, bool) {
 	if it.Page == nil {
-		p, err := it.diskManager.ReadPage(it.tableName, it.pageIteratorCursor.pageId)
+		p, err := it.diskManager.readPage(it.tableName, it.pageIteratorCursor.pageId)
 		if err != nil {
 			return nil, false
 		}
@@ -110,7 +110,7 @@ func (it *TupleIterator) next(txMgr *TransactionManager) (*Tuple, bool) {
 		}
 	}
 
-	p, err := it.diskManager.ReadPage(it.tableName, it.pageIteratorCursor.pageId)
+	p, err := it.diskManager.readPage(it.tableName, it.pageIteratorCursor.pageId)
 	// TODO: add page not found case
 	if err != nil {
 		return nil, false
@@ -134,11 +134,41 @@ func (it *TupleIterator) GetTupleId() *TupleId {
 	}
 }
 
-func (st *Storage) ReadPage(tableName string, pageId PageId) (*Page, error) {
-	return st.diskManager.ReadPage(tableName, pageId)
+func (st *Storage) GetTupleFromPage(tableName string, pageId PageId, pkValue string, transaction *Transaction, transactionMgr *TransactionManager) (*Tuple, error) {
+	page, err := st.diskManager.readPage(tableName, pageId)
+	if err != nil {
+		return nil, err
+	}
+
+	for slotId, tuple := range page.Tuples {
+		if tuple == nil {
+			continue
+		}
+		if tuple.Data[0].Value == pkValue {
+			if transactionMgr.IsLockShared(transaction, &TupleId{
+				pageId: pageId,
+				slotId: uint8(slotId),
+			}) || transactionMgr.IsLockExclusive(transaction, &TupleId{
+				pageId: pageId,
+				slotId: uint8(slotId),
+			}) || transactionMgr.LockShared(transaction, &TupleId{
+				pageId: pageId,
+				slotId: uint8(slotId),
+			}) {
+				return tuple, nil
+			} else {
+				return nil, fmt.Errorf("don't have lock for tuple %v", tuple)
+			}
+		}
+	}
+	return nil, fmt.Errorf("tuple not found")
 }
 
-func (st *Storage) WritePage(page *Page) error {
+func (st *Storage) readPage(tableName string, pageId PageId) (*Page, error) {
+	return st.diskManager.readPage(tableName, pageId)
+}
+
+func (st *Storage) writePage(page *Page) error {
 	return st.diskManager.WritePage(page)
 }
 
@@ -226,7 +256,7 @@ func (st *Storage) InsertTuple(tableName string, tuple *Tuple, tx *Transaction, 
 }
 
 func (st *Storage) DeleteTuple(tableName string, tupleId *TupleId, tx *Transaction, txMgr *TransactionManager) error {
-	page, err := st.diskManager.ReadPage(tableName, tupleId.pageId)
+	page, err := st.diskManager.readPage(tableName, tupleId.pageId)
 	if err != nil {
 		return err
 	}
