@@ -88,8 +88,13 @@ func (tm *TransactionManager) LockExclusive(tx *Transaction, tupleId *TupleId) b
 		return false
 	}
 
-	if _, ok := tm.sharedLockTable[*tupleId]; ok {
-		return false
+	if sharedLockedTxs, ok := tm.sharedLockTable[*tupleId]; ok {
+		for _, sharedLockedTx := range sharedLockedTxs {
+			if sharedLockedTx == tx.id {
+				continue
+			}
+			return false
+		}
 	}
 
 	tm.exclusiveLockTable[*tupleId] = tx.id
