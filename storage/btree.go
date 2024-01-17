@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 )
 
@@ -263,13 +262,13 @@ func (n *Node) scan() []StringItem {
 
 func (n *Node) printNode(indent int) {
 	// 各ノードのアイテムをインデントして表示
-	indentStr := strings.Repeat(" ", indent)
-	fmt.Printf("%sNode Items: %v\n", indentStr, n.Items)
+	//indentStr := strings.Repeat(" ", indent)
+	//fmt.Printf("%sNode Items: %v\n", indentStr, n.Items)
 
 	// 子ノードを再帰的に表示
-	for _, child := range n.Children {
-		child.printNode(indent + 2)
-	}
+	//for _, child := range n.Children {
+	//	child.printNode(indent + 2)
+	//}
 }
 
 func (b *BTree) PrintTree() {
