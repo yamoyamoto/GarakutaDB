@@ -90,14 +90,18 @@ func Execute(sqlString string) error {
 	for i, header := range rs.Header {
 		headerParts[i] = fmt.Sprintf("%-*s", columnWidths[i], header)
 	}
-	fmt.Println(strings.Join(headerParts, " | "))
+	if len(rs.Header) > 0 {
+		fmt.Println(strings.Join(headerParts, " | "))
+	}
 
 	// 仕切りの出力
 	separatorParts := make([]string, len(rs.Header))
 	for i, width := range columnWidths {
 		separatorParts[i] = strings.Repeat("-", width)
 	}
-	fmt.Println(strings.Join(separatorParts, "-+-"))
+	if len(rs.Header) > 0 {
+		fmt.Println(strings.Join(separatorParts, "-+-"))
+	}
 
 	// 行の出力
 	for _, row := range rs.Rows {
