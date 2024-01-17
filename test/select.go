@@ -90,7 +90,6 @@ func Execute(sqlString string) error {
 	for i, header := range rs.Header {
 		headerParts[i] = fmt.Sprintf("%-*s", columnWidths[i], header)
 	}
-	fmt.Println()
 	fmt.Println(strings.Join(headerParts, " | "))
 
 	// 仕切りの出力
@@ -109,7 +108,6 @@ func Execute(sqlString string) error {
 		fmt.Println(strings.Join(rowParts, " | "))
 	}
 
-	fmt.Println()
 	fmt.Println(rs.Message)
 	fmt.Println()
 
